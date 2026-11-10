@@ -1,9 +1,19 @@
+# Reto Platform Engineering - ED Team
 
-# Reto DevSecOps - ED Team
+Una **plataforma interna de desarrollo (IDP) en miniatura** construida sobre GitHub Actions: un *golden path* de autoservicio que lleva cualquier app del `git push` a una URL pública en servicios **serverless** de Azure y AWS, con la seguridad incluida por defecto y sin clusters que administrar. Dos APIs mínimas (Python Flask y Go) hacen de "equipos de producto" que consumen la plataforma.
 
-Dos APIs (Python Flask y Go) con pipeline DevSecOps completo sobre GitHub Actions: análisis de seguridad estático y de contenedor, y despliegue automatizado en servicios **serverless** de Azure y AWS (sin clusters que administrar).
+> 📖 **Toda la documentación (con diagramas) está en [`doc/`](doc/Home.md)** y se publica automáticamente en la Wiki del repositorio. Si eres estudiante, empieza por [¿Qué es Ingeniería de Plataforma?](doc/00-Ingenieria-de-Plataforma.md) y luego el [laboratorio paso a paso](doc/08-Laboratorio-Paso-a-Paso.md).
 
-> 📖 **Toda la documentación (con diagramas) está en [`doc/`](doc/Home.md)** y se publica automáticamente en la Wiki del repositorio. Si eres estudiante, empieza por [doc/Home.md](doc/Home.md) y el [laboratorio paso a paso](doc/08-Laboratorio-Paso-a-Paso.md).
+## Qué ofrece la plataforma
+
+| Capacidad | Cómo la entrega este repo |
+|-----------|---------------------------|
+| 🛤️ **Golden path** de despliegue | `cd.yml` / `cd-go.yml`: build → release → deploy → smoke test, igual para cualquier app |
+| 🙋 **Autoservicio** | El equipo solo hace `git push`; infraestructura con un clic (`infraestructure.yml`) |
+| ☁️ **Multi-cloud con una variable** | `CLOUD_PROVIDER=azure\|aws`, o los dos a la vez con `cd-go-multicloud.yml` |
+| 🛡️ **Seguridad por defecto** (DevSecOps) | CI con SAST (CodeQL), SCA y escaneo de imagen (Grype) en cada cambio |
+| 🧱 **Bloques reutilizables** | `scripts/` idempotentes que comparten los tres CD |
+| 📚 **Plataforma como producto** | Docs como código publicadas en la Wiki, laboratorio y plantillas de issues |
 
 ## APIs
 
@@ -145,9 +155,9 @@ Configura todo en **GitHub → Settings → Secrets and variables → Actions**.
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|
 | `CLOUD_PROVIDER` | Proveedor destino de `cd.yml` / `cd-go.yml` | `azure` / `aws` |
-| `RESOURCE_GROUP` | Resource Group existente | `rg-edteam-devsecops` |
+| `RESOURCE_GROUP` | Resource Group existente | `rg-edteam-platform` |
 | `AZURE_LOCATION` | Región de Azure | `eastus` |
-| `REGISTRY_NAME` | Nombre del ACR (sin `.azurecr.io`) | `acredteamdevsecops` |
+| `REGISTRY_NAME` | Nombre del ACR (sin `.azurecr.io`) | `acredteamplatform` |
 | `CONTAINER_NAME` | Nombre base; la Container App Go es `<CONTAINER_NAME>-go` | `ed-team-app` |
 | `CONTAINERAPP_ENV_NAME` | Container Apps Environment | `cae-edteam` |
 | `FUNCTION_APP_NAME` | Function App de Python (único global) | `func-edteam-app` |

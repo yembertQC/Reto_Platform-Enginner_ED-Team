@@ -1,8 +1,8 @@
 {
   "CLOUD_PROVIDER": "azure",
-  "RESOURCE_GROUP": "rg-edteam-devsecops",
+  "RESOURCE_GROUP": "rg-edteam-platform",
   "AZURE_LOCATION": "eastus",
-  "REGISTRY_NAME": "acredteamdevsecops",
+  "REGISTRY_NAME": "acredteamplatform",
   "CONTAINER_NAME": "ed-team-app",
   "CONTAINERAPP_ENV_NAME": "cae-edteam",
   "FUNCTION_APP_NAME": "func-edteam-app",

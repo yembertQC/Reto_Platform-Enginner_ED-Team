@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Qué es este repo
 
-Reto DevSecOps (material de curso de plataforma): dos APIs mínimas e idénticas en comportamiento (`GET /` → `{"message": "Hola ED Team"}`, `GET /health` → `{"status": "healthy"}`) cuyo valor real está en los pipelines de GitHub Actions (SAST/SCA/escaneo de imagen + despliegue **serverless** en Azure y AWS). La mayor parte del trabajo se hace en `.github/workflows/` y `scripts/`, no en el código de las apps. Documentación en español; mantener ese idioma.
+Reto de **Platform Engineering** (material de curso de Ingeniería de Plataforma): una IDP en miniatura sobre GitHub Actions. Dos APIs mínimas e idénticas en comportamiento (`GET /` → `{"message": "Hola ED Team"}`, `GET /health` → `{"status": "healthy"}`) hacen de consumidoras del *golden path*; el valor real está en los pipelines (CI DevSecOps con SAST/SCA/escaneo de imagen como capa de seguridad + despliegue **serverless** en Azure y AWS). Al documentar, enmarcar todo como plataforma; DevSecOps es solo la parte de seguridad del CI. La mayor parte del trabajo se hace en `.github/workflows/` y `scripts/`, no en el código de las apps. Documentación en español; mantener ese idioma.
 
 | App | Azure | AWS |
 |-----|-------|-----|

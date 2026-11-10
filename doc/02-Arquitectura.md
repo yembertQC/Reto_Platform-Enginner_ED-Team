@@ -155,7 +155,7 @@ Todos los nombres salen de **variables de GitHub** (ver [7 · Configuración de 
 
 | Recurso | Nombre | Ejemplo |
 |---------|--------|---------|
-| ACR | `REGISTRY_NAME` | `acredteamdevsecops` |
+| ACR | `REGISTRY_NAME` | `acredteamplatform` |
 | Container Apps Environment | `CONTAINERAPP_ENV_NAME` | `cae-edteam` |
 | Container App Go | `<CONTAINER_NAME>-go` | `ed-team-app-go` |
 | Function App Python | `FUNCTION_APP_NAME` | `func-edteam-app` |

@@ -142,7 +142,7 @@ jobs:
         TAG: ${{ steps.tag_version.outputs.tag }}
         # Los datos van por env (no interpolados en el script) para evitar inyección
         NOTES: |
-            ## 🚀 Reto DevSecOps Deployment - Python (Serverless)
+            ## 🚀 Reto Platform Engineering · Despliegue Python (Serverless)
 
             ### 📋 Build Information:
             - **Artifact**: `${{ needs.build.outputs.artifact }}`

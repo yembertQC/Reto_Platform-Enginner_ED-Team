@@ -94,9 +94,9 @@ az ad sp create-for-rbac \
 | Nombre | Nube | Ejemplo | Para qué |
 |--------|------|---------|----------|
 | `CLOUD_PROVIDER` | ambas | `azure` o `aws` | A qué nube despliegan `cd.yml` y `cd-go.yml` |
-| `RESOURCE_GROUP` | Azure | `rg-edteam-devsecops` | Resource Group **existente** |
+| `RESOURCE_GROUP` | Azure | `rg-edteam-platform` | Resource Group **existente** |
 | `AZURE_LOCATION` | Azure | `eastus` | Región (debe soportar Flex Consumption y Container Apps) |
-| `REGISTRY_NAME` | Azure | `acredteamdevsecops` | ACR · único global · solo letras y números |
+| `REGISTRY_NAME` | Azure | `acredteamplatform` | ACR · único global · solo letras y números |
 | `CONTAINER_NAME` | Azure | `ed-team-app` | La Container App se llama `<CONTAINER_NAME>-go` |
 | `CONTAINERAPP_ENV_NAME` | Azure | `cae-edteam` | Container Apps Environment |
 | `FUNCTION_APP_NAME` | Azure | `func-edteam-app` | Function App · único global (define la URL) |

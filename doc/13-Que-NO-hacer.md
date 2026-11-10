@@ -67,7 +67,7 @@ flowchart LR
 | **Copiar y pegar** lógica de despliegue en cada workflow | Scripts reutilizables (`scripts/`) o workflows reutilizables | Arreglas un bug una vez, no N veces |
 | Usar actions por **tag** (`@v4`) o actions **archivadas** | Fijarlas por **SHA** con `# vX.Y.Z` y dejar que Dependabot las actualice | Un tag se puede mover; una action archivada no recibe parches (ver [14 · Buenas prácticas](14-Buenas-Practicas-GitHub.md)) |
 | Dar permisos amplios a nivel de workflow | `permissions: {}` arriba y permisos mínimos **por job** | Si un job se compromete, solo puede hacer lo que su permiso permite |
-| **Hardcodear** nombres (`ACR_NAME="acredteamdevsecops"`) | Variables de GitHub (`vars.REGISTRY_NAME`) | Otra persona o entorno no puede reutilizar el pipeline |
+| **Hardcodear** nombres (`ACR_NAME="acredteamplatform"`) | Variables de GitHub (`vars.REGISTRY_NAME`) | Otra persona o entorno no puede reutilizar el pipeline |
 | Relanzar un job fallido **sin leer el error** | Leer el log y el [árbol de diagnóstico](09-Operacion-y-Troubleshooting.md) | Los reintentos a ciegas esconden problemas reales |
 | Aprobar un deploy a `production` **sin mirar** qué se despliega | Revisar el commit, la release y el resultado del CI | La aprobación es un control, no un trámite |
 

@@ -132,7 +132,7 @@ jobs:
         TAG: ${{ steps.tag_version.outputs.tag }}
         # Los datos van por env (no interpolados en el script) para evitar inyección
         NOTES: |
-            ## Reto DevSecOps Deployment - Go (Serverless)
+            ## 🚀 Reto Platform Engineering · Despliegue Go (Serverless)
 
             ### Build Information:
             - **Image**: `${{ needs.buildImage.outputs.image-tag }}`
