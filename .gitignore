@@ -160,6 +160,8 @@ docker-compose.override.yml
 # -----------------------------------------------------------------------------
 .claude/settings.local.json
 CLAUDE.local.md
+# Archivos que genera Claude en local (carpeta completa con todo su contenido)
+Claude outputs/
 
 # -----------------------------------------------------------------------------
 # 💻 Sistema operativo
