@@ -36,10 +36,10 @@ flowchart TB
 
     subgraph BUILD["🏗️ Job build"]
         V -->|"azure"| Z1["Instala dependencias<br/>y comprueba imports"]
-        Z1 --> Z2["📦 Empaqueta src/ en<br/>function-app.zip"]
+        Z1 --> Z2["📦 Empaqueta src/ en<br/>function-app.zip<br/>(sin run.sh)"]
         V -->|"aws"| A1["Instala dependencias<br/>y comprueba imports"]
-        A1 --> A2["🐳 docker build src/Dockerfile"]
-        A2 --> A3["📤 push a ECR<br/>tag = sha corto"]
+        A1 --> A2["📦 pip --target manylinux2014_x86_64<br/>+ app.py + run.sh<br/>→ lambda-python.zip"]
+        A2 --> A3["📤 upload-artifact<br/>lambda-python"]
     end
 
     Z2 --> REL["🏷️ Job release<br/>v AAAAMMDD - sha"]
@@ -48,7 +48,7 @@ flowchart TB
     subgraph DEPLOY["🚀 Job deploy · environment production"]
         REL --> D{"CLOUD_PROVIDER"}
         D -->|"azure"| DZ["⚡ az functionapp deployment<br/>source config-zip<br/>--build-remote true"]
-        D -->|"aws"| DA["λ scripts/deploy-lambda.sh"]
+        D -->|"aws"| DA["λ download-artifact +<br/>scripts/deploy-lambda.sh<br/>python3.13 · handler run.sh"]
         DZ --> SM["✅ scripts/smoke-test.sh"]
         DA --> SM
     end
@@ -67,6 +67,8 @@ flowchart TB
 
 > 🧠 **Remote build:** a Azure se sube solo el código. Azure instala las dependencias de `requirements.txt` en sus servidores, con el sistema operativo correcto.
 
+> 📦 **En AWS el zip lleva las dependencias dentro:** el job `build` las instala con `pip --target` pidiendo wheels de Linux x86_64 para Python 3.13 (`--platform manylinux2014_x86_64 --only-binary=:all:`), así el paquete sirve en Lambda aunque se haya construido en otra máquina. El zip pasa al job `deploy` como **artifact** de GitHub Actions; el job `build` ya no necesita credenciales de AWS.
+
 ---
 
 ## 🐹 `cd-go.yml` — CD Go
@@ -74,17 +76,21 @@ flowchart TB
 ```mermaid
 flowchart TB
     START["git push con cambios en src-go/"] --> T["🧪 go test -race"]
-    T --> V{"CLOUD_PROVIDER"}
 
-    V -->|"azure"| Z1["🔑 Login en ACR"]
-    V -->|"aws"| A1["🔑 Login en ECR"]
-    Z1 --> BLD["🐳 docker build<br/>linux/amd64 · sin attestations"]
-    A1 --> BLD
-    BLD --> PUSH["📤 push de la imagen<br/>tag = sha corto"]
-    PUSH --> REL["🏷️ release go-v AAAAMMDD - sha"]
+    subgraph BUILD["🏗️ Job build"]
+        T --> V{"CLOUD_PROVIDER"}
+        V -->|"azure"| Z1["🔑 Login en GHCR<br/>con GITHUB_TOKEN"]
+        Z1 --> Z2["🐳 docker build<br/>linux/amd64 · un solo manifiesto"]
+        Z2 --> Z3["📤 push a GHCR<br/>tag = sha corto"]
+        V -->|"aws"| A1["🏗️ go build → bootstrap<br/>CGO_ENABLED=0 · linux/amd64"]
+        A1 --> A2["📦 lambda-go.zip<br/>upload-artifact"]
+    end
+
+    Z3 --> REL["🏷️ release go-v AAAAMMDD - sha"]
+    A2 --> REL
     REL --> D{"CLOUD_PROVIDER"}
-    D -->|"azure"| DZ["🐳 scripts/deploy-containerapp.sh"]
-    D -->|"aws"| DA["λ scripts/deploy-lambda.sh"]
+    D -->|"azure"| DZ["🐳 scripts/deploy-containerapp.sh<br/>¿paquete GHCR público?"]
+    D -->|"aws"| DA["λ download-artifact +<br/>scripts/deploy-lambda.sh<br/>provided.al2023 · handler bootstrap"]
     DZ --> SM["✅ smoke-test.sh"]
     DA --> SM
 
@@ -92,44 +98,49 @@ flowchart TB
     classDef aws fill:#FDEBD0,stroke:#FF9900,color:#1a1a1a
     classDef common fill:#F2F3F4,stroke:#777,color:#1a1a1a
     classDef dec fill:#F4ECF7,stroke:#7D3C98,color:#1a1a1a
-    class Z1,DZ azure
-    class A1,DA aws
-    class START,T,BLD,PUSH,REL,SM common
+    class Z1,Z2,Z3,DZ azure
+    class A1,A2,DA aws
+    class START,T,REL,SM common
     class V,D dec
 ```
+
+- El job se llama `build` y su salida `artifact` es la referencia de la imagen (Azure) o el nombre del zip (AWS); aparece en la release y en el resumen.
+- **Azure:** no hay registry en Azure. La imagen va a `ghcr.io/<owner-en-minúsculas>/<CONTAINER_NAME>-go:<sha_corto>`; el job tiene el permiso `packages: write` y se autentica con el `GITHUB_TOKEN`, sin secretos de la nube.
+- **AWS:** no hay imagen ni ECR. El binario se llama `bootstrap` porque es lo que ejecuta el runtime `provided.al2023`.
+
+> ⚠️ **Primera ejecución en Azure:** los paquetes de GHCR **nacen privados**, aunque el repo sea público, y Container Apps descarga la imagen **sin credenciales**. Antes de desplegar, `deploy-containerapp.sh` comprueba que la imagen se puede descargar de forma anónima; si no, el job falla con el mensaje *"el paquete de GHCR es privado"* y el enlace al paquete. Hazlo público **una sola vez** (*Package settings → Danger Zone → Change visibility → Public*) y relanza el workflow. Ver [7 · Configuración de GitHub](07-Configuracion-GitHub.md).
 
 ---
 
 ## 🌍 `cd-go-multicloud.yml` — Go en las dos nubes
 
-Construye la imagen **una sola vez** y lleva **exactamente la misma** a Azure y a AWS:
+Construye **una sola vez**, en un único job, los dos artefactos del mismo commit (la imagen para Azure y el zip para AWS) y despliega en paralelo:
 
 ```mermaid
 flowchart TB
-    BUILD["🏗️ build_once<br/>go test + imagen → GHCR"]
+    BUILD["🏗️ build_once<br/>go test + imagen → GHCR<br/>+ lambda-go.zip"]
 
-    BUILD --> PAZ["📤 promote_azure<br/>GHCR → ACR"]
-    BUILD --> PAWS["📤 promote_aws<br/>GHCR → ECR"]
     BUILD --> REL["🏷️ release<br/>go-mc-v AAAAMMDD - sha"]
 
-    PAZ --> DAZ["🐳 deploy_azure<br/>Container Apps + smoke test"]
-    PAWS --> DAWS["λ deploy_aws<br/>Lambda + smoke test"]
-    REL --> DAZ
-    REL --> DAWS
+    REL --> DAZ["🐳 deploy_azure<br/>Container Apps por digest<br/>+ smoke test"]
+    REL --> DAWS["λ deploy_aws<br/>Lambda desde el zip<br/>+ smoke test"]
+    BUILD -.->|"imagen@sha256"| DAZ
+    BUILD -.->|"artifact lambda-go"| DAWS
 
-    DAZ --> CLEAN["🧹 cleanup_ghcr<br/>borra la imagen temporal"]
-    DAWS --> CLEAN
-    CLEAN --> SUM["📋 final_summary<br/>URLs de las dos nubes"]
+    DAZ --> SUM["📋 final_summary<br/>URLs de las dos nubes"]
+    DAWS --> SUM
 
     classDef gh fill:#E3E3E3,stroke:#555,color:#1a1a1a
     classDef azure fill:#D4E6F1,stroke:#0078D4,color:#1a1a1a
     classDef aws fill:#FDEBD0,stroke:#FF9900,color:#1a1a1a
-    class BUILD,REL,CLEAN,SUM gh
-    class PAZ,DAZ azure
-    class PAWS,DAWS aws
+    class BUILD,REL,SUM gh
+    class DAZ azure
+    class DAWS aws
 ```
 
-> 🔐 La imagen se promueve por **digest** (`imagen@sha256:...`), una huella única del contenido. Así hay garantía de que Azure y AWS ejecutan **el mismo binario, byte a byte**.
+- Usa el **mismo paquete de GHCR** que `cd-go.yml` (`<CONTAINER_NAME>-go`), así que también tiene que ser público.
+- Azure despliega la imagen por **digest** (`imagen@sha256:...`), una huella única del contenido: Container Apps ejecuta exactamente la imagen construida en ese run, aunque alguien mueva el tag.
+- Ya no hay pasos de "promote" a ACR/ECR ni un job que borre la imagen de GHCR al final: Container Apps vuelve a descargarla cada vez que **escala desde cero**, así que borrarla rompería la app.
 
 ---
 
@@ -141,9 +152,13 @@ Los tres CD reutilizan los scripts de [`scripts/`](../scripts). Son **idempotent
 
 ```mermaid
 flowchart TB
-    IN["deploy-lambda.sh función imagen rol"] --> Q1{"¿Existe la Lambda?"}
-    Q1 -->|"No"| C["🆕 create-function<br/>imagen ECR · 512 MB · 30 s"]
-    Q1 -->|"Sí"| U["🔄 update-function-code<br/>con la nueva imagen"]
+    IN["deploy-lambda.sh función zip rol<br/>runtime handler puerto"] --> L{"¿Existe la layer del<br/>Lambda Web Adapter?"}
+    L -->|"No"| ERR["❌ Falla con mensaje<br/>(revisar LWA_LAYER_VERSION)"]
+    L -->|"Sí"| Q1{"¿Existe la Lambda?<br/>¿de qué tipo?"}
+    Q1 -->|"Image (antigua)"| DEL["♻️ delete-function<br/>se recrea como zip<br/>(cambia la Function URL)"]
+    DEL --> C
+    Q1 -->|"No existe"| C["🆕 create-function<br/>zip · runtime · layer LWA<br/>512 MB · 30 s"]
+    Q1 -->|"Zip"| U["🔄 update-function-code (zip)<br/>+ update-function-configuration<br/>runtime · handler · layer · env"]
     C --> W1["⏳ esperar function-active"]
     U --> W2["⏳ esperar function-updated"]
     W1 --> Q2{"¿Tiene Function URL?"}
@@ -154,24 +169,32 @@ flowchart TB
 
     classDef q fill:#F4ECF7,stroke:#7D3C98,color:#1a1a1a
     classDef a fill:#FDEBD0,stroke:#FF9900,color:#1a1a1a
-    class Q1,Q2 q
-    class C,U,W1,W2,URL,OUT,IN a
+    classDef err fill:#FADBD8,stroke:#C0392B,color:#1a1a1a
+    class L,Q1,Q2 q
+    class C,U,DEL,W1,W2,URL,OUT,IN a
+    class ERR err
 ```
+
+Las dos Lambdas reciben las variables `PORT`, `AWS_LWA_PORT`, `AWS_LWA_READINESS_CHECK_PATH=/health` y `ENVIRONMENT=production`; la de Python además `AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap` (ver [3 · Aplicaciones](03-Aplicaciones.md)).
 
 ### `deploy-containerapp.sh`
 
 ```mermaid
 flowchart TB
-    IN["deploy-containerapp.sh app rg env imagen acr puerto"] --> Q{"¿Existe la Container App?"}
-    Q -->|"No"| C["🆕 containerapp create<br/>ingress externo · puerto<br/>0 a 10 réplicas · 0.25 vCPU<br/>credenciales del ACR"]
+    IN["deploy-containerapp.sh app rg env imagen puerto"] --> P{"¿La imagen de GHCR se<br/>descarga sin credenciales?"}
+    P -->|"No (HTTP 401/403...)"| ERR["❌ Falla: paquete privado<br/>+ enlace para hacerlo público"]
+    P -->|"Sí"| Q{"¿Existe la Container App?"}
+    Q -->|"No"| C["🆕 containerapp create<br/>ingress externo · puerto<br/>0 a 10 réplicas · 0.25 vCPU<br/>sin credenciales de registry"]
     Q -->|"Sí"| U["🔄 containerapp update<br/>--image nueva"]
     C --> OUT["📤 url=https://fqdn"]
     U --> OUT
 
     classDef q fill:#F4ECF7,stroke:#7D3C98,color:#1a1a1a
     classDef z fill:#D4E6F1,stroke:#0078D4,color:#1a1a1a
-    class Q q
+    classDef err fill:#FADBD8,stroke:#C0392B,color:#1a1a1a
+    class P,Q q
     class C,U,OUT,IN z
+    class ERR err
 ```
 
 ### `smoke-test.sh`

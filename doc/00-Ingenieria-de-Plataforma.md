@@ -101,7 +101,7 @@ flowchart TB
 flowchart LR
     START["💡 Tengo una app nueva"]
     START -->|"🛤️ Golden path"| GP1["Creo mi repo<br/>desde la plantilla"] --> GP2["git push"] --> GP3["✅ En producción<br/>segura y documentada<br/>en minutos"]
-    START -->|"🧗 Camino libre"| FP1["Investigo Lambda,<br/>Functions, IAM, ACR..."] --> FP2["Escribo mis scripts<br/>y pipelines"] --> FP3["Configuro seguridad<br/>(si me acuerdo)"] --> FP4["⏳ En producción<br/>en días o semanas"]
+    START -->|"🧗 Camino libre"| FP1["Investigo Lambda,<br/>Functions, IAM, registries..."] --> FP2["Escribo mis scripts<br/>y pipelines"] --> FP3["Configuro seguridad<br/>(si me acuerdo)"] --> FP4["⏳ En producción<br/>en días o semanas"]
 
     classDef gp fill:#D5F5E3,stroke:#1E8449,color:#1a1a1a
     classDef fp fill:#FDEBD0,stroke:#CA6F1E,color:#1a1a1a

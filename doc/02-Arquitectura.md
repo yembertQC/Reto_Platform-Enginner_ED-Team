@@ -12,12 +12,11 @@ flowchart TB
         REPO["📁 Repositorio<br/>src · src-go · scripts · doc"]
         ACT["⚙️ GitHub Actions<br/>CI · CD · Infra · Wiki"]
         REL["🏷️ Releases"]
-        GHCR["📦 GHCR<br/>imagen temporal multi-cloud"]
+        GHCR["📦 GHCR<br/>imagen Go (paquete público)"]
         WIKI["📖 Wiki"]
     end
 
     subgraph AZ["☁️ Azure · Resource Group"]
-        ACR["🗄️ ACR<br/>registro de imágenes"]
         subgraph CAE["Container Apps Environment"]
             ACA["🐳 Container App Go<br/>0 a 10 réplicas"]
         end
@@ -26,9 +25,9 @@ flowchart TB
     end
 
     subgraph AWS["☁️ AWS"]
-        ECR["🗄️ ECR<br/>repo Python + repo Go"]
-        LPY["λ Lambda Python"]
-        LGO["λ Lambda Go"]
+        LPY["λ Lambda Python<br/>zip · python3.13"]
+        LGO["λ Lambda Go<br/>zip · provided.al2023"]
+        LWA["🔌 Layer<br/>Lambda Web Adapter"]
         IAM["🔑 Rol IAM<br/>de ejecución"]
     end
 
@@ -38,14 +37,11 @@ flowchart TB
     ACT --> REL
     ACT --> WIKI
     ACT -->|"zip"| FUNC
-    ACT -->|"imagen Go"| ACR
-    ACT -->|"imágenes"| ECR
-    ACT -.->|"multi-cloud"| GHCR
-    GHCR -.->|"promote"| ACR
-    GHCR -.->|"promote"| ECR
+    ACT -->|"imagen Go"| GHCR
+    ACT -->|"zip"| LPY & LGO
 
-    ACR --> ACA
-    ECR --> LPY & LGO
+    GHCR -->|"pull anónimo"| ACA
+    LWA -.-> LPY & LGO
     IAM -.-> LPY & LGO
     FUNC --- ST
 
@@ -59,15 +55,17 @@ flowchart TB
     classDef aws fill:#FDEBD0,stroke:#FF9900,color:#1a1a1a
     classDef user fill:#D5F5E3,stroke:#1E8449,color:#1a1a1a
     class REPO,ACT,REL,GHCR,WIKI gh
-    class ACR,ACA,FUNC,ST azure
-    class ECR,LPY,LGO,IAM aws
+    class ACA,FUNC,ST azure
+    class LPY,LGO,LWA,IAM aws
     class USER user
 ```
 
 | App | Azure | AWS |
 |-----|-------|-----|
-| 🐍 Python | ⚡ Azure Functions: código en zip, Flask montado con `WsgiFunctionApp` | λ Lambda: imagen de contenedor + Lambda Web Adapter |
-| 🐹 Go | 🐳 Container Apps: imagen desde ACR | λ Lambda: la **misma** imagen + Lambda Web Adapter |
+| 🐍 Python | ⚡ Azure Functions: código en zip, Flask montado con `WsgiFunctionApp` | λ Lambda: zip (runtime `python3.13`) + Lambda Web Adapter como layer |
+| 🐹 Go | 🐳 Container Apps: imagen desde GHCR | λ Lambda: zip con el binario `bootstrap` (runtime `provided.al2023`) + Lambda Web Adapter como layer |
+
+> 🧠 **No hay registry en la nube** (ni ACR en Azure ni ECR en AWS). La única imagen que se despliega es la de Go en Container Apps, y vive en **GitHub Container Registry (GHCR)**: el CD la sube con el `GITHUB_TOKEN` y Container Apps la descarga sin credenciales, por eso el paquete debe ser **público** (ver [7 · Configuración de GitHub](07-Configuracion-GitHub.md)). Lambda recibe paquetes **zip**.
 
 ---
 
@@ -138,7 +136,7 @@ sequenceDiagram
 
     U->>URL: GET https://xxxx.lambda-url.us-east-1.on.aws/health
     URL->>L: Evento de invocación
-    L->>A: Entrega el evento a la extensión
+    L->>A: Entrega el evento al adapter (layer)
     A->>APP: Lo convierte en HTTP normal a localhost
     APP-->>A: 200 healthy
     A-->>L: Lo convierte en respuesta de Lambda
@@ -155,23 +153,23 @@ Todos los nombres salen de **variables de GitHub** (ver [7 · Configuración de 
 
 | Recurso | Nombre | Ejemplo |
 |---------|--------|---------|
-| ACR | `REGISTRY_NAME` | `acredteamplatform` |
 | Container Apps Environment | `CONTAINERAPP_ENV_NAME` | `cae-edteam` |
 | Container App Go | `<CONTAINER_NAME>-go` | `ed-team-app-go` |
 | Function App Python | `FUNCTION_APP_NAME` | `func-edteam-app` |
 | Storage Account | `STORAGE_ACCOUNT_NAME` | `stedteamfunc` |
-| Repo ECR / Lambda Python | `ECR_REPOSITORY_NAME` | `ed-team-app` |
-| Repo ECR / Lambda Go | `<ECR_REPOSITORY_NAME>-go` | `ed-team-app-go` |
-| Rol IAM de Lambda | `<ECR_REPOSITORY_NAME>-lambda-role` | `ed-team-app-lambda-role` |
+| Paquete GHCR de la imagen Go | `<CONTAINER_NAME>-go` | `ed-team-app-go` |
+| Lambda Python | `LAMBDA_NAME` | `ed-team-app` |
+| Lambda Go | `<LAMBDA_NAME>-go` | `ed-team-app-go` |
+| Rol IAM de Lambda | `<LAMBDA_NAME>-lambda-role` | `ed-team-app-lambda-role` |
 
-### Imágenes y releases
+### Artefactos y releases
 
 | Artefacto | Formato |
 |-----------|---------|
-| Imagen Go en Azure | `<REGISTRY_NAME>.azurecr.io/<CONTAINER_NAME>-go:<sha_corto>` |
-| Imagen Python en AWS | `<cuenta>.dkr.ecr.<región>.amazonaws.com/<ECR_REPOSITORY_NAME>:<sha_corto>` |
-| Imagen Go en AWS | `<cuenta>.dkr.ecr.<región>.amazonaws.com/<ECR_REPOSITORY_NAME>-go:<sha_corto>` |
-| Imagen temporal multi-cloud | `ghcr.io/<owner>/ed-team-app-go-multicloud:mc-<run_id>-<sha_corto>` |
+| Imagen Go en Azure (GHCR) | `ghcr.io/<owner-en-minúsculas>/<CONTAINER_NAME>-go:<sha_corto>` (el multi-cloud despliega por digest `@sha256:...`) |
+| Paquete Python para Azure Functions | `function-app.zip` (artifact del run) |
+| Paquete Python para Lambda | `lambda-python.zip` (artifact del run) |
+| Paquete Go para Lambda | `lambda-go.zip` con el binario `bootstrap` (artifact del run) |
 | Release Python | `v<AAAAMMDD>-<sha_corto>` |
 | Release Go | `go-v<AAAAMMDD>-<sha_corto>` |
 | Release Go multi-cloud | `go-mc-v<AAAAMMDD>-<sha_corto>` |
@@ -189,7 +187,7 @@ flowchart LR
     ROOT --> WF["📁 .github/workflows/<br/>8 pipelines"]
     ROOT --> DOC["📁 doc/<br/>esta wiki"]
 
-    SRC --> S1["app.py · function_app.py<br/>host.json · requirements.txt<br/>Dockerfile"]
+    SRC --> S1["app.py · function_app.py<br/>host.json · requirements.txt<br/>run.sh · Dockerfile"]
     SRCGO --> S2["main.go · main_test.go<br/>go.mod · Dockerfile"]
 
     classDef dir fill:#FFF5D6,stroke:#B58900,color:#1a1a1a

@@ -1,40 +1,86 @@
 #!/usr/bin/env bash
-# Crea o actualiza una función AWS Lambda a partir de una imagen de ECR y la
-# expone públicamente con una Function URL (sin API Gateway).
+# Crea o actualiza una función AWS Lambda a partir de un paquete zip y la expone
+# públicamente con una Function URL (sin API Gateway ni registry de contenedores).
 #
-# La imagen debe incluir el AWS Lambda Web Adapter (ver src/Dockerfile y
-# src-go/Dockerfile): así el servidor HTTP normal (Gunicorn / net/http) corre
-# dentro de Lambda sin cambiar el código.
+# El AWS Lambda Web Adapter se añade como layer: así el servidor HTTP normal
+# (Gunicorn / net/http) corre dentro de Lambda sin cambiar el código.
+#   - Go:     runtime provided.al2023, el zip contiene el binario "bootstrap".
+#   - Python: runtime python3.x, el zip contiene app.py, sus dependencias y run.sh;
+#             AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap hace que el adapter arranque run.sh.
 #
-# Uso: deploy-lambda.sh <function-name> <image-uri> <execution-role-name>
+# Uso: deploy-lambda.sh <function-name> <zip-file> <execution-role-name> <runtime> <handler> <port>
+#   ej. deploy-lambda.sh ed-team-app-go lambda-go.zip ed-team-app-lambda-role provided.al2023 bootstrap 8080
+#   ej. deploy-lambda.sh ed-team-app lambda-python.zip ed-team-app-lambda-role python3.13 run.sh 5000
 # Requiere credenciales AWS y región ya configuradas (aws-actions/configure-aws-credentials).
+# LWA_LAYER_VERSION (opcional, por defecto 30) fija la versión de la layer LambdaAdapterLayerX86.
 # Escribe url=<function-url> en $GITHUB_OUTPUT (o stdout fuera de Actions).
 set -euo pipefail
 
 FUNCTION_NAME="$1"
-IMAGE_URI="$2"
+ZIP_FILE="$2"
 ROLE_NAME="$3"
+RUNTIME="$4"
+HANDLER="$5"
+PORT="$6"
 OUT="${GITHUB_OUTPUT:-/dev/stdout}"
+
+REGION="${AWS_REGION:-$(aws configure get region)}"
+LWA_LAYER_ARN="arn:aws:lambda:${REGION}:753240598075:layer:LambdaAdapterLayerX86:${LWA_LAYER_VERSION:-30}"
+
+[ -f "$ZIP_FILE" ] || { echo "❌ No existe el paquete $ZIP_FILE"; exit 1; }
+
+if ! aws lambda get-layer-version-by-arn --arn "$LWA_LAYER_ARN" >/dev/null 2>&1; then
+  echo "❌ No se encuentra la layer del Lambda Web Adapter: $LWA_LAYER_ARN"
+  echo "   Revisa la versión vigente en https://github.com/aws/aws-lambda-web-adapter y pásala en LWA_LAYER_VERSION."
+  exit 1
+fi
+
+# Variables del adapter: puerto de la app y ruta de readiness.
+ENV_VARS="ENVIRONMENT=production,PORT=$PORT,AWS_LWA_PORT=$PORT,AWS_LWA_READINESS_CHECK_PATH=/health"
+# En runtimes gestionados (python3.x) el handler es un script: el wrapper del adapter lo arranca.
+# En provided.al2023 el propio binario "bootstrap" es el servidor y no hace falta.
+if [[ "$RUNTIME" != provided* ]]; then
+  ENV_VARS="$ENV_VARS,AWS_LAMBDA_EXEC_WRAPPER=/opt/bootstrap"
+fi
 
 ROLE_ARN=$(aws iam get-role --role-name "$ROLE_NAME" --query Role.Arn --output text)
 
-if aws lambda get-function --function-name "$FUNCTION_NAME" >/dev/null 2>&1; then
-  echo "🔄 Actualizando imagen de la Lambda $FUNCTION_NAME -> $IMAGE_URI"
+# Una Lambda creada antes como imagen de contenedor no se puede pasar a zip: se recrea.
+PACKAGE_TYPE=$(aws lambda get-function --function-name "$FUNCTION_NAME" \
+  --query Configuration.PackageType --output text 2>/dev/null || echo "none")
+if [ "$PACKAGE_TYPE" = "Image" ]; then
+  echo "♻️ $FUNCTION_NAME era una Lambda de imagen: se elimina para recrearla como zip"
+  aws lambda delete-function --function-name "$FUNCTION_NAME"
+  PACKAGE_TYPE="none"
+fi
+
+if [ "$PACKAGE_TYPE" = "Zip" ]; then
+  echo "🔄 Actualizando código de la Lambda $FUNCTION_NAME con $ZIP_FILE"
   aws lambda update-function-code \
     --function-name "$FUNCTION_NAME" \
-    --image-uri "$IMAGE_URI" >/dev/null
+    --zip-file "fileb://$ZIP_FILE" >/dev/null
+  aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
+  aws lambda update-function-configuration \
+    --function-name "$FUNCTION_NAME" \
+    --runtime "$RUNTIME" \
+    --handler "$HANDLER" \
+    --layers "$LWA_LAYER_ARN" \
+    --environment "Variables={$ENV_VARS}" >/dev/null
   aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
 else
-  echo "🆕 Creando Lambda $FUNCTION_NAME con $IMAGE_URI"
+  echo "🆕 Creando Lambda $FUNCTION_NAME ($RUNTIME) con $ZIP_FILE"
   aws lambda create-function \
     --function-name "$FUNCTION_NAME" \
-    --package-type Image \
-    --code ImageUri="$IMAGE_URI" \
+    --package-type Zip \
+    --zip-file "fileb://$ZIP_FILE" \
+    --runtime "$RUNTIME" \
+    --handler "$HANDLER" \
+    --layers "$LWA_LAYER_ARN" \
     --role "$ROLE_ARN" \
     --architectures x86_64 \
     --memory-size 512 \
     --timeout 30 \
-    --environment "Variables={ENVIRONMENT=production}" >/dev/null
+    --environment "Variables={$ENV_VARS}" >/dev/null
   aws lambda wait function-active-v2 --function-name "$FUNCTION_NAME"
 fi
 

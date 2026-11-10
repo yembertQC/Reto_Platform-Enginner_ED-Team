@@ -96,8 +96,7 @@ Permisos por job en este repo:
 | Release (crea el tag y la release) | `contents: write` |
 | CodeQL y Container scan | `contents: read`, `security-events: write`, `actions: read` |
 | Dependency review (comenta en el PR) | `contents: read`, `pull-requests: write` |
-| Build multi-cloud (sube a GHCR) | `contents: read`, `packages: write` |
-| Promote a ACR/ECR (lee de GHCR) | `packages: read` |
+| Build de Go en `cd-go.yml` y `build_once` del multi-cloud (suben la imagen a GHCR) | `contents: read`, `packages: write` |
 | Publicar la wiki | `contents: write` |
 | Infraestructura | ninguno |
 

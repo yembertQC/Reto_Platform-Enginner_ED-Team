@@ -1,8 +1,9 @@
 name: Provision Infrastructure (Serverless)
 
-# Azure: ACR + Container Apps Environment (app Go) y Storage Account + Function App Flex Consumption (app Python).
-# AWS:   repositorios ECR (Python y Go) + rol IAM de ejecución para Lambda.
-# Las Container Apps y las funciones Lambda las crea el CD en el primer despliegue (necesitan una imagen ya publicada).
+# Azure: Container Apps Environment (app Go) y Storage Account + Function App Flex Consumption (app Python).
+# AWS:   rol IAM de ejecución para Lambda.
+# No se crea ningún registry: la imagen de Go vive en GitHub Container Registry (GHCR) y Lambda recibe paquetes zip.
+# Las Container Apps y las funciones Lambda las crea el CD en el primer despliegue (necesitan el artefacto ya construido).
 
 on:
   workflow_dispatch:
@@ -28,7 +29,6 @@ env:
   # Azure
   RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
   AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
-  REGISTRY_NAME: ${{ vars.REGISTRY_NAME }}
   CONTAINER_NAME_GO: ${{ vars.CONTAINER_NAME }}-go
   CONTAINERAPP_ENV_NAME: ${{ vars.CONTAINERAPP_ENV_NAME }}
   FUNCTION_APP_NAME: ${{ vars.FUNCTION_APP_NAME }}
@@ -36,8 +36,8 @@ env:
   FUNCTION_PYTHON_VERSION: ${{ vars.FUNCTION_PYTHON_VERSION || '3.13' }}
   # AWS
   AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY_NAME: ${{ vars.ECR_REPOSITORY_NAME }}
-  LAMBDA_ROLE_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-lambda-role
+  LAMBDA_NAME: ${{ vars.LAMBDA_NAME }}
+  LAMBDA_ROLE_NAME: ${{ vars.LAMBDA_NAME }}-lambda-role
 
 # Sin permisos por defecto: cada job declara solo los que necesita
 permissions: {}
@@ -65,7 +65,6 @@ jobs:
 
         echo "=== CREATING AZURE SERVERLESS INFRASTRUCTURE ==="
         echo "- Resource Group:            $RG (existente)"
-        echo "- ACR:                       ${{ env.REGISTRY_NAME }}"
         echo "- Container Apps Environment: ${{ env.CONTAINERAPP_ENV_NAME }}"
         echo "- Storage Account:           ${{ env.STORAGE_ACCOUNT_NAME }}"
         echo "- Function App:              ${{ env.FUNCTION_APP_NAME }} (Python ${{ env.FUNCTION_PYTHON_VERSION }})"
@@ -81,28 +80,14 @@ jobs:
         echo "✅ Resource Group exists: $RG"
 
         # 2. Proveedores de recursos (requiere permisos a nivel suscripción; si ya están registrados no hace falta)
-        for NS in Microsoft.App Microsoft.ContainerRegistry Microsoft.Web Microsoft.Storage; do
+        for NS in Microsoft.App Microsoft.Web Microsoft.Storage; do
           az provider register --namespace "$NS" --wait 2>/dev/null \
             || echo "::warning::No se pudo registrar $NS (puede que ya esté registrado o falten permisos)"
         done
 
         az extension add --name containerapp --upgrade --only-show-errors
 
-        # 3. Azure Container Registry (imágenes de la app Go)
-        if az acr show --name "${{ env.REGISTRY_NAME }}" > /dev/null 2>&1; then
-          echo "⚠️ ACR already exists: ${{ env.REGISTRY_NAME }}"
-        else
-          az acr create \
-            --resource-group "$RG" \
-            --name "${{ env.REGISTRY_NAME }}" \
-            --location "$LOC" \
-            --sku Basic \
-            --admin-enabled true \
-            --only-show-errors > /dev/null
-          echo "✅ ACR created: ${{ env.REGISTRY_NAME }}"
-        fi
-
-        # 4. Container Apps Environment (sin Log Analytics para mantener costo y limpieza mínimos)
+        # 3. Container Apps Environment (sin Log Analytics para mantener costo y limpieza mínimos)
         if az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
           echo "⚠️ Container Apps Environment already exists: ${{ env.CONTAINERAPP_ENV_NAME }}"
         else
@@ -115,7 +100,7 @@ jobs:
           echo "✅ Container Apps Environment created: ${{ env.CONTAINERAPP_ENV_NAME }}"
         fi
 
-        # 5. Storage Account (requerido por Azure Functions)
+        # 4. Storage Account (requerido por Azure Functions)
         if az storage account show --name "${{ env.STORAGE_ACCOUNT_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
           echo "⚠️ Storage Account already exists: ${{ env.STORAGE_ACCOUNT_NAME }}"
         else
@@ -129,7 +114,7 @@ jobs:
           echo "✅ Storage Account created: ${{ env.STORAGE_ACCOUNT_NAME }}"
         fi
 
-        # 6. Function App en plan Flex Consumption (app Python)
+        # 5. Function App en plan Flex Consumption (app Python)
         if az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
           echo "⚠️ Function App already exists: ${{ env.FUNCTION_APP_NAME }}"
         else
@@ -151,7 +136,6 @@ jobs:
     - name: Generate Azure Summary
       run: |
         RG="${{ env.RESOURCE_GROUP }}"
-        ACR_SERVER=$(az acr show --name "${{ env.REGISTRY_NAME }}" --query loginServer -o tsv)
         CAE_DOMAIN=$(az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" --query properties.defaultDomain -o tsv)
         FUNC_HOST=$(az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" --query defaultHostName -o tsv)
 
@@ -160,7 +144,6 @@ jobs:
         echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
         echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
         echo "| Resource Group | \`$RG\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| ACR | \`$ACR_SERVER\` |" >> $GITHUB_STEP_SUMMARY
         echo "| Container Apps Environment | \`${{ env.CONTAINERAPP_ENV_NAME }}\` (\`$CAE_DOMAIN\`) |" >> $GITHUB_STEP_SUMMARY
         echo "| Storage Account | \`${{ env.STORAGE_ACCOUNT_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
         echo "| Function App | \`https://$FUNC_HOST\` |" >> $GITHUB_STEP_SUMMARY
@@ -169,6 +152,7 @@ jobs:
         echo "### 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
         echo "1. Variable \`CLOUD_PROVIDER\` = \`azure\`" >> $GITHUB_STEP_SUMMARY
         echo "2. Push a \`src/\` (Python → Azure Functions) o \`src-go/\` (Go → Container App \`${{ env.CONTAINER_NAME_GO }}\`), o lanzar los CD manualmente" >> $GITHUB_STEP_SUMMARY
+        echo "3. Tras el primer CD de Go, haz **público** el paquete \`${{ env.CONTAINER_NAME_GO }}\` de GHCR (una sola vez) para que Container Apps lo descargue sin credenciales" >> $GITHUB_STEP_SUMMARY
 
   # ===============================
   # AZURE - Destroy Infrastructure
@@ -234,14 +218,6 @@ jobs:
           echo "- Storage Account: Not found"
         fi
 
-        # ACR
-        if az acr show --name "${{ env.REGISTRY_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
-          az acr delete --name "${{ env.REGISTRY_NAME }}" --resource-group "$RG" --yes
-          echo "🗑️ ACR deleted: ${{ env.REGISTRY_NAME }}"
-        else
-          echo "- ACR: Not found"
-        fi
-
         echo ""
         echo "✅ Azure cleanup completed"
 
@@ -251,8 +227,8 @@ jobs:
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **Container App / Environment**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
         echo "- **Function App / Plan / Storage Account**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
-        echo "- **ACR**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
         echo "- **Resource Group**: ✅ Preserved" >> $GITHUB_STEP_SUMMARY
+        echo "- **Imágenes en GHCR**: ✅ Preserved (se borran desde la pestaña Packages de GitHub)" >> $GITHUB_STEP_SUMMARY
 
   # ===========================
   # AWS - Create Infrastructure
@@ -274,24 +250,12 @@ jobs:
       run: |
         set -euo pipefail
         echo "=== CREATING AWS SERVERLESS INFRASTRUCTURE ==="
-        echo "- ECR: ${{ env.ECR_REPOSITORY_NAME }} (Python), ${{ env.ECR_REPOSITORY_NAME }}-go (Go)"
         echo "- IAM role: ${{ env.LAMBDA_ROLE_NAME }}"
         echo "- Region: ${{ env.AWS_REGION }}"
         echo ""
 
-        # 1. Repositorios ECR
-        for REPO in "${{ env.ECR_REPOSITORY_NAME }}" "${{ env.ECR_REPOSITORY_NAME }}-go"; do
-          if aws ecr describe-repositories --repository-names "$REPO" > /dev/null 2>&1; then
-            echo "⚠️ ECR repository already exists: $REPO"
-          else
-            aws ecr create-repository \
-              --repository-name "$REPO" \
-              --image-scanning-configuration scanOnPush=true > /dev/null
-            echo "✅ ECR repository created: $REPO"
-          fi
-        done
-
-        # 2. Rol de ejecución para Lambda (solo logs en CloudWatch)
+        # Rol de ejecución para Lambda (solo logs en CloudWatch).
+        # No hay repositorios ECR: las Lambdas se despliegan como paquetes zip.
         if aws iam get-role --role-name "${{ env.LAMBDA_ROLE_NAME }}" > /dev/null 2>&1; then
           echo "⚠️ IAM role already exists: ${{ env.LAMBDA_ROLE_NAME }}"
         else
@@ -311,21 +275,16 @@ jobs:
 
     - name: Generate AWS Summary
       run: |
-        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
-
         echo "## 🎉 AWS Serverless Infrastructure Created" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
         echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-        echo "| ECR (Python) | \`$ECR_REGISTRY/${{ env.ECR_REPOSITORY_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
-        echo "| ECR (Go) | \`$ECR_REGISTRY/${{ env.ECR_REPOSITORY_NAME }}-go\` |" >> $GITHUB_STEP_SUMMARY
         echo "| Lambda execution role | \`${{ env.LAMBDA_ROLE_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
         echo "| Region | ${{ env.AWS_REGION }} |" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "### 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
         echo "1. Variable \`CLOUD_PROVIDER\` = \`aws\`" >> $GITHUB_STEP_SUMMARY
-        echo "2. Push a \`src/\` o \`src-go/\` (o lanzar los CD manualmente): el primer despliegue crea las Lambdas \`${{ env.ECR_REPOSITORY_NAME }}\` y \`${{ env.ECR_REPOSITORY_NAME }}-go\` con su Function URL" >> $GITHUB_STEP_SUMMARY
+        echo "2. Push a \`src/\` o \`src-go/\` (o lanzar los CD manualmente): el primer despliegue crea las Lambdas \`${{ env.LAMBDA_NAME }}\` y \`${{ env.LAMBDA_NAME }}-go\` con su Function URL" >> $GITHUB_STEP_SUMMARY
 
   # ============================
   # AWS - Destroy Infrastructure
@@ -348,7 +307,7 @@ jobs:
         echo "=== DESTROYING AWS SERVERLESS INFRASTRUCTURE ==="
         echo ""
 
-        for NAME in "${{ env.ECR_REPOSITORY_NAME }}" "${{ env.ECR_REPOSITORY_NAME }}-go"; do
+        for NAME in "${{ env.LAMBDA_NAME }}" "${{ env.LAMBDA_NAME }}-go"; do
           # Lambda (su Function URL se elimina junto con la función)
           if aws lambda get-function --function-name "$NAME" > /dev/null 2>&1; then
             aws lambda delete-function --function-name "$NAME"
@@ -360,14 +319,6 @@ jobs:
           # Logs de CloudWatch de la Lambda
           aws logs delete-log-group --log-group-name "/aws/lambda/$NAME" 2>/dev/null \
             && echo "🗑️ Log group deleted: /aws/lambda/$NAME"
-
-          # Repositorio ECR
-          if aws ecr describe-repositories --repository-names "$NAME" > /dev/null 2>&1; then
-            aws ecr delete-repository --repository-name "$NAME" --force > /dev/null
-            echo "🗑️ ECR repository deleted: $NAME"
-          else
-            echo "- ECR $NAME: Not found"
-          fi
         done
 
         # Rol IAM de Lambda
@@ -390,5 +341,4 @@ jobs:
         echo "## 🗑️ AWS Serverless Infrastructure Cleanup" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "- **Lambdas + Function URLs + log groups**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
-        echo "- **ECR repositories**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
         echo "- **Lambda IAM role**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY

@@ -16,7 +16,7 @@ Funciona, pero todavía **no es una plataforma**: para que otro equipo lo use te
 | 🔐 **Acceso a la nube** | Tres secretos estáticos guardados en el repo | Identidad federada (**OIDC**), sin contraseñas guardadas |
 | 🛡️ **Seguridad** | CI DevSecOps con SAST (CodeQL), SCA y escaneo de imagen (Grype); aprobación manual en `production` | Reglas en código que se aplican igual a todos los repos, los toque una persona o un agente |
 
-Lo que la plataforma reutiliza tal cual: los `scripts/` idempotentes que comparten los tres CD, el cambio de nube con una variable (`CLOUD_PROVIDER=azure|aws`) y la imagen única con Lambda Web Adapter.
+Lo que la plataforma reutiliza tal cual: los `scripts/` idempotentes que comparten los tres CD, el cambio de nube con una variable (`CLOUD_PROVIDER=azure|aws`) y el despliegue sin registry en la nube (imagen en GHCR para Container Apps, zip para Lambda).
 
 ## APIs
 
@@ -36,10 +36,13 @@ Ambas APIs exponen los mismos endpoints:
 
 | App | Azure | AWS |
 |-----|-------|-----|
-| Python | **Azure Functions** (Flex Consumption) — Flask montado con `WsgiFunctionApp` | **AWS Lambda** — imagen de contenedor + Lambda Web Adapter, Function URL |
-| Go | **Azure Container Apps** — imagen desde ACR, escala 0-10 | **AWS Lambda** — imagen de contenedor + Lambda Web Adapter, Function URL |
+| Python | **Azure Functions** (Flex Consumption) — zip con remote build, Flask montado con `WsgiFunctionApp` | **AWS Lambda** — zip (`python3.13`) + Lambda Web Adapter como layer, Function URL |
+| Go | **Azure Container Apps** — imagen desde **GitHub Container Registry (GHCR)**, escala 0-10 | **AWS Lambda** — zip con el binario `bootstrap` (`provided.al2023`) + Lambda Web Adapter como layer, Function URL |
 
-Cada servicio entrega su propia URL HTTPS pública y escala a cero cuando no hay tráfico. Los Dockerfiles incluyen el [AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter), así la misma imagen funciona en Lambda, en Container Apps y en local sin cambiar el código.
+Cada servicio entrega su propia URL HTTPS pública y escala a cero cuando no hay tráfico. **No se aprovisiona ningún registry en la nube** (ni ACR ni ECR):
+
+- La imagen de Go se publica en GHCR con el `GITHUB_TOKEN` del workflow y Container Apps la descarga sin credenciales. Para eso el paquete tiene que ser **público**: los paquetes de GHCR nacen privados, así que tras el primer CD de Go hay que cambiarlo una vez en *Package settings → Change visibility → Public*. Si no, el CD se detiene con un aviso y el enlace al paquete.
+- Lambda recibe paquetes zip, y el [AWS Lambda Web Adapter](https://github.com/aws/aws-lambda-web-adapter) va como *layer*: el servidor HTTP normal (Gunicorn / `net/http`) corre en Lambda sin cambiar el código.
 
 ## Estructura del proyecto
 
@@ -53,13 +56,13 @@ Cada servicio entrega su propia URL HTTPS pública y escala a cero cuando no hay
   ci-go.yml               # CI Go — tests, SAST, SCA, escaneo de imagen
   cd.yml                  # CD Python — Azure Functions o Lambda (según CLOUD_PROVIDER)
   cd-go.yml               # CD Go — Container Apps o Lambda (según CLOUD_PROVIDER)
-  cd-go-multicloud.yml    # CD Go Multi-Cloud — build único → Container Apps + Lambda en paralelo (manual)
+  cd-go-multicloud.yml    # CD Go Multi-Cloud — build único (imagen + zip) → Container Apps + Lambda en paralelo (manual)
   infraestructure.yml     # Infraestructura — create/destroy por cloud (manual)
   infra-multicloud.yml    # Infraestructura Multi-Cloud — dispara Azure + AWS a la vez (manual)
   wiki.yml                # Publica doc/ en la Wiki de GitHub (valida enlaces y diagramas)
 scripts/
-  deploy-lambda.sh        # Crea/actualiza una Lambda (imagen ECR) + Function URL
-  deploy-containerapp.sh  # Crea/actualiza una Azure Container App
+  deploy-lambda.sh        # Crea/actualiza una Lambda (zip + layer del Web Adapter) + Function URL
+  deploy-containerapp.sh  # Crea/actualiza una Azure Container App con una imagen pública de GHCR
   smoke-test.sh           # Verifica /health y / de una URL pública con reintentos
   build-wiki.sh           # Genera la wiki desde doc/ y valida enlaces
 doc/
@@ -73,11 +76,12 @@ src/
   function_app.py         # Entrada de Azure Functions (envuelve app.py vía WSGI)
   host.json               # Config de Functions (sin prefijo /api)
   requirements.txt        # Flask, Gunicorn, azure-functions
-  Dockerfile              # Imagen Python 3.13 + Gunicorn + Lambda Web Adapter
+  run.sh                  # Arranque de Gunicorn dentro de AWS Lambda (handler del zip)
+  Dockerfile              # Imagen Python 3.13 + Gunicorn (ejecución local y escaneo del CI)
 src-go/
   main.go                 # Aplicación Go
   main_test.go            # Tests unitarios
-  Dockerfile              # Imagen multi-stage Go 1.23 + Lambda Web Adapter
+  Dockerfile              # Imagen multi-stage Go 1.23 (Container Apps y local)
 ```
 
 ## Pipelines
@@ -100,27 +104,27 @@ build → release → deploy (environment: production) + smoke test
 ```
 
 - **azure** — empaqueta `src/` en un zip y lo despliega en la Function App con remote build.
-- **aws** — construye `src/Dockerfile`, lo publica en ECR y crea/actualiza la Lambda con su Function URL.
+- **aws** — empaqueta `app.py`, `run.sh` y las dependencias en un zip y crea/actualiza la Lambda (`python3.13`) con su Function URL.
 - Release `v<YYYYMMDD>-<sha-short>`.
 
 ### CD Go — `cd-go.yml`
 Push a `main` con cambios en `src-go/` (o manual).
 
 ```
-buildImage (go test -race) → release → deploy (environment: production) + smoke test
+build (go test -race) → release → deploy (environment: production) + smoke test
 ```
 
-- **azure** — imagen en ACR → Azure Container App `<CONTAINER_NAME>-go`.
-- **aws** — imagen en ECR → Lambda `<ECR_REPOSITORY_NAME>-go` con Function URL.
+- **azure** — imagen `ghcr.io/<owner>/<CONTAINER_NAME>-go` en GHCR → Azure Container App `<CONTAINER_NAME>-go`.
+- **aws** — binario `bootstrap` en un zip → Lambda `<LAMBDA_NAME>-go` con Function URL.
 - Release `go-v<YYYYMMDD>-<sha-short>`.
 
 ### CD Go Multi-Cloud — `cd-go-multicloud.yml`
-Ejecución **manual**. Construye la imagen **una sola vez** en GHCR, la promueve por digest a ACR y ECR, y despliega en paralelo en Container Apps y Lambda.
+Ejecución **manual**. Construye **una sola vez** la imagen (en GHCR) y el zip de Lambda, y despliega en paralelo: Container Apps por digest y Lambda desde el zip.
 
 ```
-build_once (GHCR) ──┬── promote_azure (ACR) ── deploy_azure (Container Apps)
-                    ├── promote_aws   (ECR) ── deploy_aws   (Lambda)
-                    └── release (tag go-mc-v<YYYYMMDD>-<sha-short>)
+build_once (imagen GHCR + zip) ──┬── deploy_azure (Container Apps, imagen@digest)
+                                 ├── deploy_aws   (Lambda, zip)
+                                 └── release (tag go-mc-v<YYYYMMDD>-<sha-short>)
 ```
 
 ### Infraestructura — `infraestructure.yml`
@@ -128,10 +132,10 @@ Ejecución **manual**. Seleccionar proveedor (`azure` / `aws`) y acción (`creat
 
 | Cloud | create | destroy |
 |-------|--------|---------|
-| Azure | ACR, Container Apps Environment, Storage Account y Function App (Flex Consumption, Python) | Borra todo lo anterior y la Container App. Conserva el Resource Group |
-| AWS | Repos ECR (Python y Go) y rol IAM de ejecución para Lambda | Borra Lambdas, Function URLs, log groups, repos ECR y rol IAM |
+| Azure | Container Apps Environment, Storage Account y Function App (Flex Consumption, Python) | Borra todo lo anterior y la Container App. Conserva el Resource Group |
+| AWS | Rol IAM de ejecución para Lambda | Borra Lambdas, Function URLs, log groups y rol IAM |
 
-Las Container Apps y las Lambdas se crean en el primer despliegue del CD, porque necesitan una imagen ya publicada.
+Las Container Apps y las Lambdas se crean en el primer despliegue del CD, porque necesitan el artefacto ya construido. Las imágenes de GHCR no se borran con `destroy`: se gestionan desde la pestaña **Packages** de GitHub.
 
 ### Infraestructura Multi-Cloud — `infra-multicloud.yml`
 Ejecución **manual**. Dispara `infraestructure.yml` simultáneamente para Azure y AWS.
@@ -151,7 +155,7 @@ Configura todo en **GitHub → Settings → Secrets and variables → Actions**.
 | `AWS_ACCESS_KEY_ID` | AWS | Access Key ID de IAM |
 | `AWS_SECRET_ACCESS_KEY` | AWS | Secret Access Key de IAM |
 
-> `GITHUB_TOKEN` se genera automáticamente.
+> `GITHUB_TOKEN` se genera automáticamente; con él se publica la imagen en GHCR, sin credenciales de registry adicionales.
 
 ### Variables de repositorio
 
@@ -160,14 +164,13 @@ Configura todo en **GitHub → Settings → Secrets and variables → Actions**.
 | `CLOUD_PROVIDER` | Proveedor destino de `cd.yml` / `cd-go.yml` | `azure` / `aws` |
 | `RESOURCE_GROUP` | Resource Group existente | `rg-edteam-platform` |
 | `AZURE_LOCATION` | Región de Azure | `eastus` |
-| `REGISTRY_NAME` | Nombre del ACR (sin `.azurecr.io`) | `acredteamplatform` |
-| `CONTAINER_NAME` | Nombre base; la Container App Go es `<CONTAINER_NAME>-go` | `ed-team-app` |
+| `CONTAINER_NAME` | Nombre base; la Container App Go y su paquete de GHCR son `<CONTAINER_NAME>-go` | `ed-team-app` |
 | `CONTAINERAPP_ENV_NAME` | Container Apps Environment | `cae-edteam` |
 | `FUNCTION_APP_NAME` | Function App de Python (único global) | `func-edteam-app` |
 | `STORAGE_ACCOUNT_NAME` | Storage de la Function App (único global) | `stedteamfunc` |
 | `FUNCTION_PYTHON_VERSION` | Opcional, por defecto `3.13` | `3.13` |
 | `AWS_REGION` | Región de AWS | `us-east-1` |
-| `ECR_REPOSITORY_NAME` | Base para repos ECR, Lambdas y rol IAM | `ed-team-app` |
+| `LAMBDA_NAME` | Nombre base: Lambda Python `<LAMBDA_NAME>`, Lambda Go `<LAMBDA_NAME>-go`, rol IAM `<LAMBDA_NAME>-lambda-role` | `ed-team-app` |
 
 ### Environments de GitHub
 

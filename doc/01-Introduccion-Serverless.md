@@ -110,14 +110,14 @@ stateDiagram-v2
 | Servicio | Nube | Qué despliegas | Lo usamos para | Escala a cero |
 |----------|------|----------------|----------------|---------------|
 | ⚡ **Azure Functions** (Flex Consumption) | Azure | **Código** (un zip con Python) | App Python | ✅ |
-| 🐳 **Azure Container Apps** | Azure | **Imagen de contenedor** | App Go | ✅ (`minReplicas 0`) |
-| λ **AWS Lambda** | AWS | **Imagen de contenedor** (o código) | Apps Python y Go | ✅ |
+| 🐳 **Azure Container Apps** | Azure | **Imagen de contenedor** (desde GHCR) | App Go | ✅ (`minReplicas 0`) |
+| λ **AWS Lambda** | AWS | **Código** en un zip (también admite imágenes, aquí no las usamos) | Apps Python y Go | ✅ |
 
 ```mermaid
 flowchart LR
     Q{"¿Qué tienes?"}
     Q -->|"Código de funciones<br/>(Python, JS, C#...)"| F["⚡ Azure Functions<br/>λ Lambda con código"]
-    Q -->|"Un contenedor que<br/>escucha HTTP"| C["🐳 Container Apps<br/>λ Lambda con imagen"]
+    Q -->|"Una app web que<br/>escucha HTTP"| C["🐳 Container Apps (imagen)<br/>λ Lambda (zip + layer)"]
     C --> NOTE["En Lambda necesitas el<br/>Lambda Web Adapter<br/>(ver página 3)"]
 
     classDef q fill:#FFE8A3,stroke:#B58900,color:#1a1a1a

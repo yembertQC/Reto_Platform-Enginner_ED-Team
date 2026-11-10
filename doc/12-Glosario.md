@@ -2,7 +2,6 @@
 
 | Término | Significado |
 |---------|-------------|
-| **ACR** (Azure Container Registry) | Registro privado de imágenes Docker de Azure. |
 | **Antipatrón** | Solución que parece buena pero causa problemas a medio plazo (ver [13 · Qué NO hacer](13-Que-NO-hacer.md)). |
 | **Artifact** (GitHub Actions) | Archivo que un job guarda para que otro job lo use (por ejemplo `function-app.zip`). |
 | **Azure Container Apps** | Servicio serverless de Azure que ejecuta contenedores y escala según el tráfico, incluso a cero. |
@@ -22,11 +21,10 @@
 | **Dockerfile** | Receta para construir una imagen de contenedor. |
 | **DORA** | Cuatro métricas de entrega de software: frecuencia de despliegue, lead time, tasa de fallos y tiempo de recuperación. |
 | **Drift** | Diferencia entre lo que dice el código/pipeline y lo que realmente hay en la nube (normalmente por cambios a mano). |
-| **ECR** (Elastic Container Registry) | Registro privado de imágenes Docker de AWS. |
 | **Environment** (GitHub) | Destino de despliegue con reglas (revisores, ramas permitidas, esperas). |
 | **Flex Consumption** | Plan de Azure Functions que escala a cero y cobra por ejecución. |
 | **Function URL** | URL HTTPS pública que AWS asigna directamente a una Lambda, sin API Gateway. |
-| **GHCR** (GitHub Container Registry) | Registro de imágenes de GitHub (`ghcr.io`). |
+| **GHCR** (GitHub Container Registry) | Registro de imágenes de GitHub (`ghcr.io`). Aquí guarda la imagen de Go que usa Container Apps; sus paquetes nacen privados y este se hace público una vez. Sustituye a un registry propio de la nube (ACR en Azure, ECR en AWS). |
 | **Golden path** | Camino recomendado, ya resuelto y seguro, para hacer algo en una plataforma. |
 | **Grype** | Escáner de vulnerabilidades de imágenes de contenedor (de Anchore). |
 | **Guardrail** | Control automático que evita errores graves sin frenar al equipo. |
@@ -35,8 +33,9 @@
 | **IDP** (Internal Developer Platform) | Plataforma interna de autoservicio que usan los equipos para construir, desplegar y operar sus apps. |
 | **Ingeniería de Plataforma** | Disciplina que construye y mantiene la IDP tratándola como un producto (ver [página 0](00-Ingenieria-de-Plataforma.md)). |
 | **Job summary** | Resumen en Markdown que un job escribe y que se ve en la pestaña *Summary* de la ejecución. |
-| **Lambda** | Servicio serverless de AWS que ejecuta código o contenedores bajo demanda. |
-| **Lambda Web Adapter** | Extensión que permite ejecutar una app web normal dentro de Lambda traduciendo eventos a HTTP. |
+| **Lambda** | Servicio serverless de AWS que ejecuta código o contenedores bajo demanda. En este repo recibe paquetes zip. |
+| **Lambda layer** | Paquete de archivos que Lambda monta en `/opt` junto al código de la función; permite compartir binarios o librerías sin meterlos en cada zip. |
+| **Lambda Web Adapter** | Extensión que permite ejecutar una app web normal dentro de Lambda traduciendo eventos a HTTP. Aquí se añade como **layer** pública de AWS (`LambdaAdapterLayerX86`). |
 | **Mermaid** | Lenguaje para dibujar diagramas con texto dentro de Markdown. |
 | **Mínimo privilegio** | Dar solo los permisos estrictamente necesarios. |
 | **Multi-stage build** | Dockerfile con varias etapas: se compila en una y se copia solo el resultado a otra más pequeña. |

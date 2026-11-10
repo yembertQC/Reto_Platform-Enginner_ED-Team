@@ -3,3 +3,4 @@ Dockerfile
 __pycache__/
 *.pyc
 local.settings.json
+run.sh

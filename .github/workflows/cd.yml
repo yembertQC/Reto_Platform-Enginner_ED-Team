@@ -1,7 +1,8 @@
 name: CD - Python (Serverless)
 
 # Azure -> Azure Functions (Flex Consumption), código Python con la app Flask montada vía WSGI.
-# AWS   -> AWS Lambda con imagen de contenedor (ECR) + Lambda Web Adapter, expuesta con Function URL.
+# AWS   -> AWS Lambda con paquete zip (python3.13) + Lambda Web Adapter como layer, expuesta con Function URL.
+# Ninguno de los dos usa un registry de contenedores.
 # El cloud destino lo decide la variable de repositorio CLOUD_PROVIDER.
 
 on:
@@ -21,9 +22,9 @@ env:
   FUNCTION_APP_NAME: ${{ vars.FUNCTION_APP_NAME }}
   # AWS
   AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY_NAME: ${{ vars.ECR_REPOSITORY_NAME }}
-  LAMBDA_FUNCTION_NAME: ${{ vars.ECR_REPOSITORY_NAME }}
-  LAMBDA_ROLE_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-lambda-role
+  LAMBDA_FUNCTION_NAME: ${{ vars.LAMBDA_NAME }}
+  LAMBDA_ROLE_NAME: ${{ vars.LAMBDA_NAME }}-lambda-role
+  LAMBDA_RUNTIME: python3.13
 
 jobs:
   build:
@@ -68,7 +69,7 @@ jobs:
       if: env.CLOUD_PROVIDER == 'azure'
       working-directory: src
       run: |
-        zip -r ../function-app.zip . -x 'Dockerfile' '.funcignore' '__pycache__/*' '*.pyc'
+        zip -r ../function-app.zip . -x 'Dockerfile' '.funcignore' 'run.sh' '__pycache__/*' '*.pyc'
         unzip -l ../function-app.zip
 
     - name: Upload Azure Function package
@@ -79,35 +80,27 @@ jobs:
         path: function-app.zip
         retention-days: 7
 
-    # --- AWS: imagen de contenedor en ECR para Lambda ---
-    - name: Configure AWS Credentials
+    # --- AWS: paquete zip para Lambda (dependencias incluidas, sin registry) ---
+    - name: Package AWS Lambda
       if: env.CLOUD_PROVIDER == 'aws'
-      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      run: |
+        mkdir -p build/lambda
+        # Wheels de Linux x86_64 para el runtime de Lambda, aunque el runner fuese otra plataforma.
+        python -m pip install --target build/lambda \
+          --platform manylinux2014_x86_64 --implementation cp --python-version 3.13 \
+          --only-binary=:all: -r src/requirements.txt
+        cp src/app.py src/run.sh build/lambda/
+        chmod +x build/lambda/run.sh
+        (cd build/lambda && zip -qr ../../lambda-python.zip .)
+        ls -lh lambda-python.zip
+
+    - name: Upload AWS Lambda package
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
       with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-
-    - name: Login to ECR
-      if: env.CLOUD_PROVIDER == 'aws'
-      id: ecr
-      uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
-
-    - name: Ensure ECR repository exists
-      if: env.CLOUD_PROVIDER == 'aws'
-      run: |
-        aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_NAME }} >/dev/null 2>&1 || \
-        aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_NAME }} --image-scanning-configuration scanOnPush=true
-
-    - name: Build and push to ECR
-      if: env.CLOUD_PROVIDER == 'aws'
-      run: |
-        IMAGE="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_NAME }}:${{ steps.sha_short.outputs.sha_short }}"
-        # Lambda necesita una imagen linux/amd64 de un solo manifiesto (sin attestations).
-        docker build --platform linux/amd64 --provenance=false --sbom=false -f src/Dockerfile -t "$IMAGE" src/
-        docker push "$IMAGE"
-        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
-        echo "✅ Image built and pushed: $IMAGE"
+        name: lambda-python
+        path: lambda-python.zip
+        retention-days: 7
 
     - name: Set artifact output
       id: artifact_info
@@ -115,7 +108,7 @@ jobs:
         if [ "${{ env.CLOUD_PROVIDER }}" == "azure" ]; then
           echo "artifact=function-app.zip (Azure Functions, Python)" >> $GITHUB_OUTPUT
         else
-          echo "artifact=$IMAGE" >> $GITHUB_OUTPUT
+          echo "artifact=lambda-python.zip (AWS Lambda ${{ env.LAMBDA_RUNTIME }})" >> $GITHUB_OUTPUT
         fi
 
   release:
@@ -206,6 +199,12 @@ jobs:
         echo "✅ Azure Function desplegada: https://$HOST"
 
     # --- AWS Lambda ---
+    - name: Download AWS Lambda package
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: lambda-python
+
     - name: Configure AWS Credentials
       if: env.CLOUD_PROVIDER == 'aws'
       uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
@@ -220,8 +219,11 @@ jobs:
       run: |
         bash scripts/deploy-lambda.sh \
           "${{ env.LAMBDA_FUNCTION_NAME }}" \
-          "${{ needs.build.outputs.artifact }}" \
-          "${{ env.LAMBDA_ROLE_NAME }}"
+          lambda-python.zip \
+          "${{ env.LAMBDA_ROLE_NAME }}" \
+          "${{ env.LAMBDA_RUNTIME }}" \
+          run.sh \
+          5000
 
     # --- Validación común ---
     - name: Smoke test

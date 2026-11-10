@@ -42,7 +42,7 @@ flowchart LR
 |-------------|-------------------|------------|
 | Poner contraseñas o claves **en el código** (como `API_KEY` en `main.go`) | GitHub Secrets, Key Vault, Secrets Manager | El código se copia, se publica y queda en el historial de git **para siempre** |
 | Guardar contraseñas en **variables** de GitHub | Usar **secrets** | Las variables se ven en claro en los logs |
-| Hacer `echo` de un secret o de una contraseña obtenida en el pipeline | `::add-mask::` (como en `deploy-containerapp.sh`) o no imprimirla | Los logs los puede leer mucha gente |
+| Hacer `echo` de un secret o de una contraseña obtenida en el pipeline | `::add-mask::` o, mejor, no imprimirla ni necesitarla (como el `GITHUB_TOKEN` para GHCR) | Los logs los puede leer mucha gente |
 | Subir `.env` o `local.settings.json` al repositorio | Añadirlos a `.gitignore` | Suelen contener secretos reales |
 | Dar **Owner/Contributor de toda la suscripción** o `AdministratorAccess` en AWS a la identidad del pipeline | Mínimo privilegio: Contributor **solo** en el Resource Group, IAM con acciones concretas | Si se filtra la credencial, el daño queda acotado |
 | Usar **claves de larga duración** en producción | **OIDC** (federated credentials): GitHub obtiene tokens temporales sin guardar claves | En este curso usamos claves fijas **para simplificar**; en una empresa real, OIDC |
@@ -60,14 +60,15 @@ flowchart LR
 | Desplegar a producción **desde tu portátil** | Siempre por el pipeline | El pipeline es reproducible, auditado y pasa por los controles de seguridad |
 | Hacer push **directo a `main`** | Rama + Pull Request + revisión | El SCA (`dependency-review`) **solo se ejecuta en PRs** |
 | Usar el tag **`latest`** en imágenes | Tag inmutable por commit (`<sha_corto>`) o digest | Con `latest` no sabes qué versión corre ni puedes volver atrás |
-| Construir **una imagen distinta para cada nube** | Construir una vez y promover por digest (`cd-go-multicloud.yml`) | Si son distintas, un fallo puede aparecer solo en una nube |
-| Construir imágenes para Lambda sin `--platform linux/amd64 --provenance=false --sbom=false` | Usar siempre esas opciones | Lambda rechaza índices multi-arquitectura o con attestations |
+| Construir **cada nube desde un commit o un run distinto** | Construir una sola vez y desplegar esos artefactos en paralelo, la imagen por digest (`cd-go-multicloud.yml`) | Si salen de builds distintos, un fallo puede aparecer solo en una nube |
+| **Borrar** de GHCR la imagen que está desplegada para "ahorrar espacio" | Dejarla mientras la Container App la use | Container Apps la vuelve a descargar al escalar desde cero: si no está, la app no arranca |
+| Crear un registry en la nube (ACR, ECR) **sin necesitarlo** | GHCR para la única imagen y zip para Lambda | Es un recurso más que pagar, proteger, credencializar y borrar |
 | Quitar el **smoke test** porque "a veces tarda" | Mantenerlo con reintentos (el cold start es normal) | Es lo único que confirma que la app responde de verdad |
 | Cambiar el mensaje `Hola ED Team` sin actualizar tests y smoke test | Cambiar los tres a la vez | Fallarán `main_test.go` y `smoke-test.sh` (¡y está bien que fallen!) |
 | **Copiar y pegar** lógica de despliegue en cada workflow | Scripts reutilizables (`scripts/`) o workflows reutilizables | Arreglas un bug una vez, no N veces |
 | Usar actions por **tag** (`@v4`) o actions **archivadas** | Fijarlas por **SHA** con `# vX.Y.Z` y dejar que Dependabot las actualice | Un tag se puede mover; una action archivada no recibe parches (ver [14 · Buenas prácticas](14-Buenas-Practicas-GitHub.md)) |
 | Dar permisos amplios a nivel de workflow | `permissions: {}` arriba y permisos mínimos **por job** | Si un job se compromete, solo puede hacer lo que su permiso permite |
-| **Hardcodear** nombres (`ACR_NAME="acredteamplatform"`) | Variables de GitHub (`vars.REGISTRY_NAME`) | Otra persona o entorno no puede reutilizar el pipeline |
+| **Hardcodear** nombres (`FUNCTION_APP="func-edteam-app"`) | Variables de GitHub (`vars.FUNCTION_APP_NAME`) | Otra persona o entorno no puede reutilizar el pipeline |
 | Relanzar un job fallido **sin leer el error** | Leer el log y el [árbol de diagnóstico](09-Operacion-y-Troubleshooting.md) | Los reintentos a ciegas esconden problemas reales |
 | Aprobar un deploy a `production` **sin mirar** qué se despliega | Revisar el commit, la release y el resultado del CI | La aprobación es un control, no un trámite |
 
@@ -82,7 +83,7 @@ flowchart LR
 | Dejar recursos encendidos "por si acaso" | `destroy` al terminar; etiquetas y presupuestos | Lo que no se usa también cuesta |
 | Poner `--min-replicas 1` en todo "para evitar el cold start" | Aceptar el cold start salvo que el caso lo exija | Una réplica mínima **cobra 24/7** y anula la ventaja serverless |
 | Borrar el **Resource Group** completo para limpiar | Usar `destroy` (conserva el RG) | El RG puede tener otras cosas y permisos asignados |
-| Usar nombres genéricos (`func-app`, `storage1`) | Nombres únicos con prefijo/iniciales | ACR, Function App y Storage son **únicos en todo Azure** |
+| Usar nombres genéricos (`func-app`, `storage1`) | Nombres únicos con prefijo/iniciales | Function App y Storage son **únicos en todo Azure** |
 | Dar a la Lambda más permisos "por si los necesita" | Solo `AWSLambdaBasicExecutionRole` y añadir lo justo | Mínimo privilegio |
 
 ---

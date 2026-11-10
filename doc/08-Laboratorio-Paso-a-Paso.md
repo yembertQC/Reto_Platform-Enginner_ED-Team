@@ -68,7 +68,7 @@ CLOUD_PROVIDER = azure
 2. Se lanzan dos ejecuciones de *Provision Infrastructure (Serverless)*: una para Azure y otra para AWS.
 3. Abre cada una y mira el **Summary**.
 
-> ✅ **Checkpoint:** el summary de Azure muestra el ACR, el Container Apps Environment y la Function App. El de AWS muestra los dos repos ECR y el rol IAM.
+> ✅ **Checkpoint:** el summary de Azure muestra el Container Apps Environment, el Storage Account y la Function App. El de AWS muestra el rol IAM de Lambda. No se crea ningún registry de contenedores.
 
 ## 4️⃣ Despliega las apps
 
@@ -90,6 +90,14 @@ flowchart LR
     class SMOKE,URL ok
     class WAIT q
 ```
+
+> 📦 **La primera vez, CD - Go se para a propósito.** La imagen de Go se sube a GitHub Container Registry (GHCR) y los paquetes nuevos **nacen privados**; Container Apps la descarga sin credenciales, así que el job `deploy` falla con el mensaje *"el paquete de GHCR es privado"* y el enlace al paquete. Hazlo público **una sola vez**:
+>
+> 1. Abre el paquete `<CONTAINER_NAME>-go` (el enlace del log, o la pestaña **Packages** de tu perfil).
+> 2. **Package settings → Danger Zone → Change visibility → Public**.
+> 3. Vuelve a la ejecución de **CD - Go** y pulsa **Re-run failed jobs**.
+>
+> Detalles en [7 · Configuración de GitHub](07-Configuracion-GitHub.md).
 
 > ✅ **Checkpoint:** los dos workflows terminan en verde y el **Summary** muestra la URL de cada app.
 
@@ -133,9 +141,9 @@ git push
 
 1. Cambia la variable `CLOUD_PROVIDER` a `aws`.
 2. Vuelve a lanzar **CD - Python** y **CD - Go**.
-3. Ahora las URLs son del tipo `https://xxxx.lambda-url.us-east-1.on.aws/`.
+3. Ahora las URLs son del tipo `https://xxxx.lambda-url.us-east-1.on.aws/`. En AWS no hay imagen ni paso manual: las apps van como **zip** con el Lambda Web Adapter en una layer.
 
-**Bonus:** lanza **CD Go Multi-Cloud Manual (Serverless)** y compara las dos URLs en el *final summary*: la **misma** imagen corre en Azure y en AWS.
+**Bonus:** lanza **CD Go Multi-Cloud Manual (Serverless)** y compara las dos URLs en el *final summary*: el **mismo commit**, construido una sola vez, corre en Azure (imagen de GHCR por digest) y en AWS (zip). Usa el mismo paquete de GHCR, que ya es público.
 
 ## 8️⃣ Revisa la seguridad
 
@@ -147,7 +155,7 @@ git push
 
 **Actions → Infrastructure - Multi Cloud → Run workflow → action: `destroy`**.
 
-> ✅ **Checkpoint final:** en el portal de Azure tu Resource Group está vacío (o solo con lo que ya tenías) y en AWS no quedan Lambdas ni repos ECR del curso.
+> ✅ **Checkpoint final:** en el portal de Azure tu Resource Group está vacío (o solo con lo que ya tenías) y en AWS no quedan Lambdas ni el rol IAM del curso. Las imágenes de GHCR no se borran solas: si quieres, elimínalas desde **Packages → `<CONTAINER_NAME>-go` → Package settings → Delete this package**.
 
 ---
 

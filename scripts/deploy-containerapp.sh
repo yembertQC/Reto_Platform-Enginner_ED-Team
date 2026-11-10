@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# Crea o actualiza una Azure Container App a partir de una imagen de ACR.
+# Crea o actualiza una Azure Container App a partir de una imagen pública de
+# GitHub Container Registry (GHCR). No hace falta un registry en Azure (ACR) ni
+# credenciales: Container Apps descarga la imagen de forma anónima.
 # Ingress externo HTTPS, escala de 0 a 10 réplicas según tráfico HTTP.
 #
-# Uso: deploy-containerapp.sh <app-name> <resource-group> <environment-name> <image> <acr-name> <port>
+# Uso: deploy-containerapp.sh <app-name> <resource-group> <environment-name> <image> <port>
+#   ej. deploy-containerapp.sh ed-team-app-go rg-edteam-platform cae-edteam ghcr.io/owner/ed-team-app-go:abc1234 8080
 # Requiere sesión de Azure CLI activa (Azure/login).
 # Escribe url=https://<fqdn> en $GITHUB_OUTPUT (o stdout fuera de Actions).
 set -euo pipefail
@@ -11,9 +14,36 @@ APP_NAME="$1"
 RESOURCE_GROUP="$2"
 ENVIRONMENT_NAME="$3"
 IMAGE="$4"
-REGISTRY_NAME="$5"
-PORT="$6"
+PORT="$5"
 OUT="${GITHUB_OUTPUT:-/dev/stdout}"
+
+# Los paquetes de GHCR nacen privados (aunque el repo sea público). Si Container Apps
+# no puede descargar la imagen sin credenciales, se avisa con el enlace para hacerla pública.
+if [[ "$IMAGE" == ghcr.io/* ]]; then
+  REF="${IMAGE#ghcr.io/}"
+  if [[ "$REF" == *@* ]]; then
+    NAME="${REF%@*}"; TAG="${REF#*@}"
+  else
+    NAME="${REF%:*}"; TAG="${REF##*:}"
+  fi
+  TOKEN=$(curl -fsS "https://ghcr.io/token?scope=repository:${NAME}:pull" 2>/dev/null \
+    | sed -n 's/.*"token":"\([^"]*\)".*/\1/p' || true)
+  STATUS=$(curl -s -o /dev/null -w '%{http_code}' -I \
+    -H "Authorization: Bearer ${TOKEN}" \
+    -H "Accept: application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+    "https://ghcr.io/v2/${NAME}/manifests/${TAG}" || true)
+  if [ "$STATUS" != "200" ]; then
+    PACKAGE="${NAME##*/}"
+    echo "::error::La imagen $IMAGE no se puede descargar sin credenciales (HTTP $STATUS): el paquete de GHCR es privado."
+    echo "Hazlo público una sola vez: abre el paquete '$PACKAGE' (pestaña Packages del repo o del perfil),"
+    echo "Package settings → Danger Zone → Change visibility → Public. Después relanza el workflow."
+    if [ -n "${GITHUB_SERVER_URL:-}" ] && [ -n "${GITHUB_REPOSITORY:-}" ]; then
+      echo "Paquete: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/pkgs/container/$PACKAGE"
+    fi
+    exit 1
+  fi
+  echo "✅ Imagen pública en GHCR: $IMAGE"
+fi
 
 az extension add --name containerapp --upgrade --only-show-errors
 
@@ -26,18 +56,11 @@ if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/
     --only-show-errors >/dev/null
 else
   echo "🆕 Creando Container App $APP_NAME con $IMAGE"
-  ACR_USERNAME=$(az acr credential show --name "$REGISTRY_NAME" --query username -o tsv)
-  ACR_PASSWORD=$(az acr credential show --name "$REGISTRY_NAME" --query 'passwords[0].value' -o tsv)
-  echo "::add-mask::$ACR_PASSWORD"
-
   az containerapp create \
     --name "$APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --environment "$ENVIRONMENT_NAME" \
     --image "$IMAGE" \
-    --registry-server "$REGISTRY_NAME.azurecr.io" \
-    --registry-username "$ACR_USERNAME" \
-    --registry-password "$ACR_PASSWORD" \
     --ingress external \
     --target-port "$PORT" \
     --min-replicas 0 \

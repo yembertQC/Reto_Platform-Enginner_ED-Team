@@ -38,37 +38,37 @@ flowchart LR
 
 ## 🤝 ¿Quién crea cada recurso?
 
-Hay recursos que **no se pueden crear sin una imagen ya publicada** (una Lambda o una Container App necesitan saber qué imagen ejecutar). Por eso el trabajo se reparte:
+Hay recursos que **no se pueden crear sin el artefacto ya construido** (una Container App necesita saber qué imagen ejecutar y una Lambda, qué zip). Por eso el trabajo se reparte:
 
 ```mermaid
 flowchart TB
     subgraph INFRA["🏗️ infraestructure.yml (una vez)"]
-        I1["🗄️ ACR"]
         I2["🌐 Container Apps Environment"]
         I3["💾 Storage Account"]
         I4["⚡ Function App vacía"]
-        I5["🗄️ Repos ECR x2"]
         I6["🔑 Rol IAM de Lambda"]
     end
 
     subgraph CD["🚀 Pipelines CD (en cada despliegue)"]
+        G1["📦 Imagen Go en GHCR<br/>(se publica en cada deploy a Azure)"]
         C1["🐳 Container App Go<br/>(se crea en el primer deploy)"]
         C2["λ Lambda Python + Function URL<br/>(se crea en el primer deploy)"]
         C3["λ Lambda Go + Function URL<br/>(se crea en el primer deploy)"]
         C4["⚡ Código Python<br/>(se sube en cada deploy)"]
     end
 
-    I1 --> C1
+    G1 --> C1
     I2 --> C1
     I4 --> C4
-    I5 --> C2 & C3
     I6 --> C2 & C3
 
     classDef infra fill:#FFF5D6,stroke:#B58900,color:#1a1a1a
     classDef cd fill:#D5F5E3,stroke:#1E8449,color:#1a1a1a
-    class I1,I2,I3,I4,I5,I6 infra
-    class C1,C2,C3,C4 cd
+    class I2,I3,I4,I6 infra
+    class G1,C1,C2,C3,C4 cd
 ```
+
+> 🧠 **No se crea ningún registry de contenedores** (ni ACR ni ECR): la imagen de Go vive en GitHub Container Registry (GHCR), que no hay que aprovisionar, y las Lambdas reciben paquetes zip.
 
 ---
 
@@ -76,8 +76,8 @@ flowchart TB
 
 ```mermaid
 flowchart TB
+    GHCR["📦 GHCR (GitHub)<br/>ghcr.io/owner/CONTAINER_NAME-go<br/>paquete público"]
     subgraph RG["📦 Resource Group (ya existe, NO se crea ni se borra)"]
-        ACR["🗄️ Container Registry<br/>REGISTRY_NAME · Basic · admin on"]
         subgraph ENV["🌐 Container Apps Environment<br/>CONTAINERAPP_ENV_NAME"]
             APP["🐳 Container App<br/>CONTAINER_NAME-go"]
         end
@@ -86,26 +86,29 @@ flowchart TB
         ST["💾 Storage Account<br/>STORAGE_ACCOUNT_NAME"]
     end
 
-    ACR -->|"pull de imagen"| APP
+    GHCR -->|"pull anónimo<br/>(sin credenciales)"| APP
     FUNC --- PLAN
     FUNC -->|"guarda paquetes<br/>y estado"| ST
 
+    classDef gh fill:#E3E3E3,stroke:#555,color:#1a1a1a
     classDef azure fill:#D4E6F1,stroke:#0078D4,color:#1a1a1a
-    class ACR,APP,FUNC,PLAN,ST azure
+    class GHCR gh
+    class APP,FUNC,PLAN,ST azure
 ```
 
 | Paso de `azure-create` | Comando principal |
 |------------------------|-------------------|
 | 1. Verifica que existe el Resource Group | `az group show` |
-| 2. Registra los resource providers necesarios | `az provider register` (`Microsoft.App`, `Microsoft.ContainerRegistry`, `Microsoft.Web`, `Microsoft.Storage`) |
-| 3. Crea el registro de imágenes | `az acr create --sku Basic --admin-enabled true` |
-| 4. Crea el entorno de Container Apps | `az containerapp env create --logs-destination none` |
-| 5. Crea la cuenta de almacenamiento | `az storage account create --sku Standard_LRS` |
-| 6. Crea la Function App | `az functionapp create --flexconsumption-location … --runtime python` |
+| 2. Registra los resource providers necesarios | `az provider register` (`Microsoft.App`, `Microsoft.Web`, `Microsoft.Storage`) |
+| 3. Crea el entorno de Container Apps | `az containerapp env create --logs-destination none` |
+| 4. Crea la cuenta de almacenamiento | `az storage account create --sku Standard_LRS` |
+| 5. Crea la Function App | `az functionapp create --flexconsumption-location … --runtime python` |
+
+> 📌 El *summary* de `azure-create` recuerda el paso manual que queda: tras el primer CD de Go, hacer **público** el paquete `<CONTAINER_NAME>-go` de GHCR (una sola vez). Ver [7 · Configuración de GitHub](07-Configuracion-GitHub.md).
 
 > 💡 Se desactivan **Log Analytics** y **Application Insights** para que el entorno sea barato y el `destroy` no deje recursos sueltos. Para el curso basta con los logs en streaming (ver [9 · Operación](09-Operacion-y-Troubleshooting.md)).
 
-`azure-destroy` borra, en orden: Container App → Environment → Function App y su plan → Storage Account → ACR. **El Resource Group se conserva.**
+`azure-destroy` borra, en orden: Container App → Environment → Function App y su plan → Storage Account. **El Resource Group se conserva.** Las imágenes de GHCR **tampoco se borran**: si quieres eliminarlas, hazlo desde la pestaña *Packages* de GitHub.
 
 ---
 
@@ -114,33 +117,32 @@ flowchart TB
 ```mermaid
 flowchart TB
     subgraph REG["🌎 Región AWS_REGION"]
-        ECR1["🗄️ ECR<br/>ECR_REPOSITORY_NAME"]
-        ECR2["🗄️ ECR<br/>ECR_REPOSITORY_NAME-go"]
-        ROLE["🔑 IAM Role<br/>ECR_REPOSITORY_NAME-lambda-role<br/>AWSLambdaBasicExecutionRole"]
-        L1["λ Lambda Python<br/>512 MB · 30 s"]
-        L2["λ Lambda Go<br/>512 MB · 30 s"]
+        ROLE["🔑 IAM Role<br/>LAMBDA_NAME-lambda-role<br/>AWSLambdaBasicExecutionRole"]
+        LWA["🔌 Layer pública de AWS<br/>LambdaAdapterLayerX86"]
+        L1["λ Lambda Python<br/>LAMBDA_NAME · zip · python3.13<br/>512 MB · 30 s"]
+        L2["λ Lambda Go<br/>LAMBDA_NAME-go · zip · provided.al2023<br/>512 MB · 30 s"]
         U1["🔗 Function URL"]
         U2["🔗 Function URL"]
         CW["📜 CloudWatch Logs<br/>/aws/lambda/..."]
     end
 
-    ECR1 --> L1
-    ECR2 --> L2
     ROLE -.->|"asume el rol"| L1 & L2
+    LWA -.->|"layer"| L1 & L2
     U1 --> L1
     U2 --> L2
     L1 & L2 -->|"escriben logs"| CW
 
     classDef aws fill:#FDEBD0,stroke:#FF9900,color:#1a1a1a
-    class ECR1,ECR2,ROLE,L1,L2,U1,U2,CW aws
+    class ROLE,LWA,L1,L2,U1,U2,CW aws
 ```
 
 | Paso de `aws-create` | Comando principal |
 |----------------------|-------------------|
-| 1. Crea los dos repositorios de imágenes | `aws ecr create-repository --image-scanning-configuration scanOnPush=true` |
-| 2. Crea el rol que asumirán las Lambdas | `aws iam create-role` + `attach-role-policy AWSLambdaBasicExecutionRole` |
+| 1. Crea el rol que asumirán las Lambdas | `aws iam create-role` + `attach-role-policy AWSLambdaBasicExecutionRole` |
 
-`aws-destroy` borra: las dos Lambdas (y con ellas sus Function URLs) → sus log groups → los repos ECR → el rol IAM.
+Las Lambdas (con su paquete zip, la layer del Lambda Web Adapter y su Function URL) las crea el primer CD con [`deploy-lambda.sh`](../scripts/deploy-lambda.sh). La layer no se crea: la publica AWS en su cuenta `753240598075` y la función solo la referencia.
+
+`aws-destroy` borra: las dos Lambdas (y con ellas sus Function URLs) → sus log groups → el rol IAM.
 
 > 🧠 **Mínimo privilegio:** el rol de las Lambdas solo puede **escribir logs**. Si tu app no necesita nada más, no le des nada más.
 
@@ -153,9 +155,8 @@ flowchart TB
 | Azure Functions Flex Consumption | No (escala a cero) |
 | Container Apps con `minReplicas 0` | No (escala a cero) |
 | AWS Lambda | No |
-| ACR Basic | **Sí**, una tarifa diaria pequeña |
 | Storage Account | Céntimos por lo almacenado |
-| ECR | Céntimos por GB almacenado |
+| GHCR (paquete público) | No: GitHub Packages es gratuito para paquetes públicos |
 
 > ✅ **Buena práctica del curso:** cuando termines una sesión, ejecuta `infra-multicloud.yml` con `destroy`.
 

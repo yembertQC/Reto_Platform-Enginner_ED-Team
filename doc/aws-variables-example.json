@@ -1,5 +1,5 @@
 {
   "CLOUD_PROVIDER": "aws",
   "AWS_REGION": "us-east-1",
-  "ECR_REPOSITORY_NAME": "ed-team-app"
+  "LAMBDA_NAME": "ed-team-app"
 }

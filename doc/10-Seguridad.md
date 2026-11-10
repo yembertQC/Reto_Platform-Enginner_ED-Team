@@ -14,15 +14,14 @@ flowchart LR
     end
     subgraph IMAGE["🐳 Imagen"]
         B1["🔎 Grype en CI"]
-        B2["🔎 ECR scanOnPush"]
         B3["👤 Usuario no root"]
         B4["📦 Multi-stage mínima"]
     end
     subgraph PIPE["⚙️ Pipeline"]
         C1["🔒 Secrets cifrados"]
-        C2["🙈 Contraseña ACR enmascarada"]
+        C2["🎫 GHCR con GITHUB_TOKEN<br/>sin credenciales de registry"]
         C3["🛑 Aprobación en production"]
-        C4["🔐 Promote por digest"]
+        C4["🔐 Deploy por digest"]
     end
     subgraph CLOUD["☁️ Nube"]
         D1["🔑 Rol IAM mínimo"]
@@ -37,7 +36,7 @@ flowchart LR
     classDef p fill:#E3E3E3,stroke:#555,color:#1a1a1a
     classDef k fill:#D5F5E3,stroke:#1E8449,color:#1a1a1a
     class A1,A2 c
-    class B1,B2,B3,B4 i
+    class B1,B3,B4 i
     class C1,C2,C3,C4 p
     class D1,D2,D3 k
 ```
@@ -47,15 +46,16 @@ flowchart LR
 | SAST | CodeQL `security-extended` | `ci.yml`, `ci-go.yml` |
 | SCA | `dependency-review-action` | PRs |
 | Escaneo de imagen | Anchore Grype → SARIF | `ci.yml`, `ci-go.yml` |
-| Escaneo en el registro | ECR `scanOnPush=true` | `infraestructure.yml` |
 | Contenedor sin root | `USER appuser` (uid 1000) | Dockerfiles |
 | Imagen mínima | Multi-stage (Go) y `-slim` (Python) | Dockerfiles |
 | Mínimo privilegio | Rol Lambda solo con `AWSLambdaBasicExecutionRole` | `infraestructure.yml` |
 | Secretos fuera del código | GitHub Secrets | Todos los workflows |
-| Enmascarado en logs | `::add-mask::` para la contraseña del ACR | `scripts/deploy-containerapp.sh` |
-| Integridad de la imagen | Promote por digest GHCR → ACR/ECR | `cd-go-multicloud.yml` |
+| Sin credenciales de registry | La imagen se sube a GHCR con el `GITHUB_TOKEN` efímero del job (`packages: write`) y Container Apps la descarga de forma anónima: no hay contraseñas de registry guardadas en Azure ni en GitHub | `cd-go.yml`, `cd-go-multicloud.yml`, `scripts/deploy-containerapp.sh` |
+| Integridad de la imagen | Container Apps despliega la imagen de GHCR por digest (`@sha256:...`) | `cd-go-multicloud.yml` |
 | Aprobación humana | Environment `production` | `cd.yml`, `cd-go.yml` |
 | Storage privado | `--allow-blob-public-access false` | `infraestructure.yml` |
+
+> ⚠️ **El paquete de GHCR es público** (hace falta para que Container Apps lo descargue sin credenciales). Cualquiera puede bajar la imagen de Go y, con ella, el binario que lleva dentro las credenciales de ejemplo de `main.go`. Aquí se aceptan porque son valores de ejemplo, pero es otra razón para no meter nunca un secreto real en el código ni en una imagen.
 
 ---
 

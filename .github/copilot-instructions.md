@@ -6,7 +6,7 @@ Repositorio de un curso de **Ingeniería de Plataforma**: dos APIs mínimas (Pyt
 
 - Los despliegues usan los scripts de `scripts/` (`deploy-lambda.sh`, `deploy-containerapp.sh`, `smoke-test.sh`). Cambia la configuración de Lambda o Container Apps ahí, no en los YAML.
 - En workflows: fija las actions **por SHA completo** con comentario `# vX.Y.Z`, deja `permissions: {}` a nivel de workflow y declara permisos mínimos **por job**. No uses `pull_request_target`. Pasa los datos de contexto (`${{ ... }}`) por `env`, no dentro de `run`.
-- Las imágenes para Lambda se construyen con `--platform linux/amd64 --provenance=false --sbom=false`.
+- No hay registry en la nube: la imagen de Go va a GHCR (paquete público) para Container Apps, y Lambda recibe paquetes zip con el Lambda Web Adapter como layer.
 - `src/app.py` no debe depender de ningún cloud; `src/function_app.py` lo envuelve para Azure Functions.
 - `/` debe responder `{"message": "Hola ED Team"}` y `/health` `{"status": "healthy"}`: los verifican los tests de Go y `smoke-test.sh`.
 - `src-go/main.go` contiene **vulnerabilidades intencionales** (`/search`, `/exec`, credenciales en constantes) para demostrar CodeQL. No las corrijas ni las copies salvo que se pida explícitamente.

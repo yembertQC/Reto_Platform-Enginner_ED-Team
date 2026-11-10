@@ -70,7 +70,7 @@ Sigue las páginas en orden la primera vez:
 | 0 | [¿Qué es Ingeniería de Plataforma?](00-Ingenieria-de-Plataforma.md) | Qué problema resuelve, golden paths, autoservicio, DevOps vs SRE vs Plataforma, métricas DORA y dónde encaja este repo |
 | 1 | [Introducción a Serverless](01-Introduccion-Serverless.md) | Qué es serverless, cold start, escalar a cero, comparación con Kubernetes |
 | 2 | [Arquitectura](02-Arquitectura.md) | Cómo encajan todas las piezas |
-| 3 | [Aplicaciones](03-Aplicaciones.md) | El código, los Dockerfiles y el truco del Lambda Web Adapter |
+| 3 | [Aplicaciones](03-Aplicaciones.md) | El código, los Dockerfiles, los paquetes zip y el truco del Lambda Web Adapter |
 | 4 | [Pipeline CI DevSecOps](04-Pipeline-CI-DevSecOps.md) | SAST, SCA y escaneo de contenedores |
 | 5 | [Pipeline CD Despliegue](05-Pipeline-CD-Despliegue.md) | Cómo llega el código a Azure y AWS |
 | 6 | [Infraestructura](06-Infraestructura.md) | Qué recursos se crean y cómo se destruyen |
@@ -89,10 +89,10 @@ Sigue las páginas en orden la primera vez:
 
 | App | Azure | AWS |
 |-----|-------|-----|
-| 🐍 Python (Flask) | ⚡ **Azure Functions** (plan Flex Consumption) | λ **AWS Lambda** + Function URL |
-| 🐹 Go (net/http) | 🐳 **Azure Container Apps** | λ **AWS Lambda** + Function URL |
+| 🐍 Python (Flask) | ⚡ **Azure Functions** (plan Flex Consumption) | λ **AWS Lambda** (zip) + Function URL |
+| 🐹 Go (net/http) | 🐳 **Azure Container Apps** (imagen en GHCR) | λ **AWS Lambda** (zip) + Function URL |
 
-Así en un solo proyecto practicas **tres servicios serverless distintos**: funciones con código (Azure Functions), contenedores serverless (Container Apps) y funciones con contenedor (Lambda).
+Así en un solo proyecto practicas **tres servicios serverless distintos**: funciones con código (Azure Functions), contenedores serverless (Container Apps) y una app web normal dentro de funciones gracias al Lambda Web Adapter (Lambda). Y sin ningún registry de contenedores en la nube: la única imagen vive en GitHub Container Registry.
 
 ---
 

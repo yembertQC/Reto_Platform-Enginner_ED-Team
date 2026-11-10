@@ -1,10 +1,8 @@
 FROM python:3.13-slim
 
-# AWS Lambda Web Adapter: permite que esta misma imagen corra en Lambda.
-# Fuera de Lambda (docker run local) es un archivo inerte.
-COPY --from=public.ecr.aws/awsguru/aws-lambda-adapter:1.1.0 /lambda-adapter /opt/extensions/lambda-adapter
-ENV AWS_LWA_PORT=5000 \
-    AWS_LWA_READINESS_CHECK_PATH=/health
+# Imagen para ejecutar la app en local y para el escaneo de seguridad del CI.
+# Ningún despliegue la usa: Azure Functions recibe un zip con remote build y
+# AWS Lambda un zip con las dependencias y run.sh.
 
 WORKDIR /app
 
