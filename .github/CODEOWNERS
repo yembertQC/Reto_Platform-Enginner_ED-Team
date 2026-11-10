@@ -1,0 +1,29 @@
+# =============================================================================
+# CODEOWNERS — quién debe revisar cada parte del repositorio
+#
+# Formato: <patrón de ruta>  <@usuario | @organización/equipo> ...
+# - La ÚLTIMA regla que coincide gana (lo específico va al final).
+# - Con el ruleset de main (".github/rulesets/proteccion-main.json") y
+#   "Require review from Code Owners", un PR que toque estas rutas necesita
+#   la aprobación de su dueño.
+# - En una organización se usan equipos, ej.: /.github/  @mi-org/plataforma
+#
+# GitHub Well-Architected (Actions security): definir CODEOWNERS en .github/
+# y proteger especialmente los workflows y el propio CODEOWNERS.
+# =============================================================================
+
+# Dueño por defecto de todo el repositorio
+*                         @yembertQC
+
+# Aplicaciones
+/src/                     @yembertQC
+/src-go/                  @yembertQC
+
+# Documentación (fuente de la wiki)
+/doc/                     @yembertQC
+
+# 🔐 Zonas sensibles: pipelines, scripts de despliegue y gobierno del repo
+/.github/                 @yembertQC
+/.github/workflows/       @yembertQC
+/.github/CODEOWNERS       @yembertQC
+/scripts/                 @yembertQC

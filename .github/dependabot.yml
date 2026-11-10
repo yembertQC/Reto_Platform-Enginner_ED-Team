@@ -1,0 +1,65 @@
+# Dependabot: mantiene al día las dependencias y abre PRs con las actualizaciones.
+# GitHub Well-Architected (Application security): usar Dependabot para proteger
+# la cadena de suministro, incluidas las GitHub Actions (que están fijadas por SHA:
+# Dependabot actualiza el SHA y el comentario "# vX.Y.Z").
+#
+# cooldown: espera unos días antes de proponer una versión recién publicada,
+# para no adoptar al instante un paquete comprometido.
+
+version: 2
+
+updates:
+  # ⚙️ GitHub Actions usadas en .github/workflows/
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  # 🐹 Módulos Go
+  - package-ecosystem: gomod
+    directory: /src-go
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      go-modules:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
+
+  # 🐍 Paquetes Python (requirements.txt)
+  - package-ecosystem: pip
+    directory: /src
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    groups:
+      python-packages:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
+
+  # 🐳 Imágenes base de los Dockerfiles (python, golang, alpine, lambda-adapter)
+  - package-ecosystem: docker
+    directories:
+      - /src
+      - /src-go
+    schedule:
+      interval: weekly
+      day: monday
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: deps

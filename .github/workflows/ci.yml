@@ -1,0 +1,96 @@
+name: Pull request - CI
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+     - 'src/**'
+    branches: [ main ]
+
+  pull_request:
+    paths:
+     - 'src/**'
+    branches: [ main ]
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+jobs:
+  SAST:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    name: SAST - codeql
+    runs-on: ubuntu-latest
+
+    strategy:
+          fail-fast: false
+          matrix:
+            include:
+            - language: python
+              build-mode: none
+            
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0   
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended
+  
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: "/language:${{matrix.language}}"
+          upload: true
+
+  SCA:
+    permissions:
+      contents: read
+      pull-requests: write
+    name: SCA - Python dependencies
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          # fail-on-severity: high
+          warn-only: true
+          comment-summary-in-pr: true
+          vulnerability-check: true
+
+  Container_security:
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    name: Dockerfile Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      
+      - name: Build image
+        run: |
+          docker build -f src/Dockerfile -t test-image src/
+
+      - name: Image Scan
+        uses: anchore/scan-action@1638637db639e0ade3258b51db49a9a137574c3e # v6.5.1
+        id: scan
+        with:
+          image: test-image
+          fail-build: false
+          severity-cutoff: high
+
+      - name: Upload sarif
+        uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        if: always()
+        with:
+          sarif_file: ${{ steps.scan.outputs.sarif }}

@@ -1,0 +1,80 @@
+name: 🐛 Reportar un error
+description: Algo no funciona (app, pipeline, script o despliegue).
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportarlo. Antes de seguir:
+        - Revisa [Operación y Troubleshooting](https://github.com/yembertQC/Reto_Platform-Enginner_ED-Team/wiki/09-Operacion-y-Troubleshooting).
+        - 🔒 **No pegues secretos** (claves, `AZURE_CREDENTIALS`, tokens). Si es un problema de seguridad, usa el [reporte privado](https://github.com/yembertQC/Reto_Platform-Enginner_ED-Team/security/advisories/new).
+        - Las vulnerabilidades de `src-go/main.go` son **intencionales** (ver `SECURITY.md`).
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      options:
+        - App Python (src/)
+        - App Go (src-go/)
+        - CI (ci.yml / ci-go.yml)
+        - CD (cd.yml / cd-go.yml / cd-go-multicloud.yml)
+        - Infraestructura (infraestructure.yml / infra-multicloud.yml)
+        - Scripts (scripts/)
+        - Wiki / documentación
+    validations:
+      required: true
+
+  - type: dropdown
+    id: cloud
+    attributes:
+      label: Nube
+      options:
+        - Azure
+        - AWS
+        - Ambas
+        - No aplica
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: ¿Qué pasó?
+      description: Qué esperabas y qué ocurrió en realidad.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Pasos para reproducirlo
+      placeholder: |
+        1. Lancé el workflow ...
+        2. ...
+    validations:
+      required: true
+
+  - type: input
+    id: run
+    attributes:
+      label: Enlace a la ejecución de GitHub Actions
+      placeholder: https://github.com/.../actions/runs/...
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Mensaje de error / logs
+      description: Copia el texto (sin secretos). Se formatea como código automáticamente.
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Comprobaciones
+      options:
+        - label: Revisé la wiki y los issues existentes.
+          required: true
+        - label: Confirmo que no he incluido secretos ni datos personales.
+          required: true

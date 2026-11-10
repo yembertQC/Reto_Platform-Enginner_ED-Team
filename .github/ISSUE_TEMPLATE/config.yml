@@ -1,0 +1,12 @@
+# Fuerza a usar una plantilla (nada de issues en blanco) y ofrece atajos útiles.
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Wiki del curso
+    url: https://github.com/yembertQC/Reto_Platform-Enginner_ED-Team/wiki
+    about: Conceptos, arquitectura y laboratorio paso a paso. Revísala antes de preguntar.
+  - name: 🩺 Operación y Troubleshooting
+    url: https://github.com/yembertQC/Reto_Platform-Enginner_ED-Team/wiki/09-Operacion-y-Troubleshooting
+    about: Errores típicos de los pipelines y cómo resolverlos.
+  - name: 🔐 Reportar una vulnerabilidad (privado)
+    url: https://github.com/yembertQC/Reto_Platform-Enginner_ED-Team/security/advisories/new
+    about: Los problemas de seguridad NO van en issues públicos.

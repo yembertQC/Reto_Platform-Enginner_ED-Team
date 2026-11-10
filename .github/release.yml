@@ -1,0 +1,27 @@
+# Categorías de las notas de release generadas automáticamente.
+# Las usa "gh release create --generate-notes" en cd.yml, cd-go.yml y cd-go-multicloud.yml
+# (y el botón "Generate release notes" de la web). Agrupa los PRs por etiqueta.
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+  categories:
+    - title: 🔐 Seguridad
+      labels:
+        - security
+    - title: ✨ Novedades
+      labels:
+        - enhancement
+    - title: 🐛 Correcciones
+      labels:
+        - bug
+    - title: 📦 Dependencias
+      labels:
+        - dependencies
+    - title: 📖 Documentación
+      labels:
+        - documentation
+    - title: 🔧 Otros cambios
+      labels:
+        - "*"

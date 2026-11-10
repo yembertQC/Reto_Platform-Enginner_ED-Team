@@ -1,0 +1,26 @@
+name: 📖 Mejorar la documentación
+description: Algo de la wiki está mal, confuso o falta.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Página afectada
+      description: URL de la wiki o archivo de doc/
+      placeholder: doc/08-Laboratorio-Paso-a-Paso.md
+    validations:
+      required: true
+
+  - type: textarea
+    id: issue
+    attributes:
+      label: ¿Qué está mal o qué falta?
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Texto o diagrama propuesto
+      description: Recuerda que la wiki se genera desde doc/ (no se edita directamente).

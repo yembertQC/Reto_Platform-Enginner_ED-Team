@@ -1,0 +1,44 @@
+name: ❓ Pregunta del curso
+description: Dudas sobre el laboratorio, los conceptos o la configuración.
+title: "[Pregunta]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ¡No hay preguntas tontas! Para que te ayudemos rápido, cuéntanos en qué punto estás.
+
+  - type: dropdown
+    id: page
+    attributes:
+      label: Página de la wiki relacionada
+      options:
+        - 0 · Ingeniería de Plataforma
+        - 1 · Introducción a Serverless
+        - 2 · Arquitectura
+        - 3 · Aplicaciones
+        - 4 · Pipeline CI DevSecOps
+        - 5 · Pipeline CD Despliegue
+        - 6 · Infraestructura
+        - 7 · Configuración de GitHub
+        - 8 · Laboratorio paso a paso
+        - 9 · Operación y Troubleshooting
+        - 10 · Seguridad
+        - 11 · Publicar la Wiki
+        - 13 · Qué NO hacer
+        - Otra / ninguna
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Tu pregunta
+    validations:
+      required: true
+
+  - type: textarea
+    id: tried
+    attributes:
+      label: ¿Qué has probado ya?
+      description: Comandos, cambios, enlaces a ejecuciones de Actions (sin secretos).

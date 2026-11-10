@@ -1,0 +1,187 @@
+# =============================================================================
+# .gitignore — Reto Platform Engineering ED Team
+# Regla: al repo solo sube código fuente, configuración SIN secretos y docs.
+# Nada generado, nada local, nada con credenciales.
+# Ver doc/13-Que-NO-hacer.md
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 🔐 Secretos y credenciales (lo más importante de este archivo)
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.env
+.envrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.jks
+id_rsa*
+id_ed25519*
+*.kubeconfig
+kubeconfig
+*credentials*.json
+*secret*.json
+*service-account*.json
+*publishsettings*
+*.PublishSettings
+*.azureProfile
+.aws/
+.azure/
+# Ejemplos de doc/ que SÍ deben subirse (no contienen datos reales)
+!doc/*-example.json
+
+# -----------------------------------------------------------------------------
+# ⚡ Azure Functions (app Python)
+# -----------------------------------------------------------------------------
+local.settings.json
+.python_packages/
+bin/
+obj/
+appsettings.*.json
+# Paquete zip que genera el pipeline (cd.yml)
+function-app.zip
+*.zip
+
+# -----------------------------------------------------------------------------
+# λ AWS (SAM / CDK / Serverless Framework, por si se añaden)
+# -----------------------------------------------------------------------------
+.aws-sam/
+samconfig.toml
+cdk.out/
+.serverless/
+
+# -----------------------------------------------------------------------------
+# 🏗️ Terraform / Pulumi (por si se migra la infra a IaC declarativa)
+# -----------------------------------------------------------------------------
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+crash.log
+crash.*.log
+.terraform.tfstate.lock.info
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+Pulumi.*.yaml
+!Pulumi.yaml
+
+# -----------------------------------------------------------------------------
+# 🐍 Python
+# -----------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+.eggs/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+pip-log.txt
+
+# -----------------------------------------------------------------------------
+# 🐹 Go
+# -----------------------------------------------------------------------------
+# Binario que genera "go build" en src-go/ (el Dockerfile lo llama "server")
+src-go/server
+src-go/ed-team-app-go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+coverage.html
+go.work
+go.work.sum
+vendor/
+
+# -----------------------------------------------------------------------------
+# 🟨 Node / Bun (herramientas como mermaid-cli)
+# -----------------------------------------------------------------------------
+node_modules/
+.npm/
+.bun/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# -----------------------------------------------------------------------------
+# 📖 Documentación generada
+# -----------------------------------------------------------------------------
+# scripts/build-wiki.sh genera aquí la wiki; la fuente es doc/
+build/
+# Clon del repositorio de la wiki que hace wiki.yml
+wiki/
+# SVG que genera mermaid-cli al validar diagramas en local
+*.mmd.svg
+
+# -----------------------------------------------------------------------------
+# 🐳 Docker
+# -----------------------------------------------------------------------------
+*.tar
+docker-compose.override.yml
+
+# -----------------------------------------------------------------------------
+# 🧰 Editores e IDEs
+# -----------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+.project
+.settings/
+.history/
+
+# -----------------------------------------------------------------------------
+# 🤖 Claude Code (la configuración compartida sí se sube; la personal no)
+# -----------------------------------------------------------------------------
+.claude/settings.local.json
+CLAUDE.local.md
+
+# -----------------------------------------------------------------------------
+# 💻 Sistema operativo
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# -----------------------------------------------------------------------------
+# 📝 Logs y temporales
+# -----------------------------------------------------------------------------
+*.log
+*.tmp
+*.temp
+*.bak
+*.orig
+tmp/
+temp/

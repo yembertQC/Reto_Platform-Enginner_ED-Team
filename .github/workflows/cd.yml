@@ -1,0 +1,251 @@
+name: CD - Python (Serverless)
+
+# Azure -> Azure Functions (Flex Consumption), código Python con la app Flask montada vía WSGI.
+# AWS   -> AWS Lambda con imagen de contenedor (ECR) + Lambda Web Adapter, expuesta con Function URL.
+# El cloud destino lo decide la variable de repositorio CLOUD_PROVIDER.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+    branches: [ main ]
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+env:
+  CLOUD_PROVIDER: ${{ vars.CLOUD_PROVIDER }}
+  # Azure
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  FUNCTION_APP_NAME: ${{ vars.FUNCTION_APP_NAME }}
+  # AWS
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY_NAME: ${{ vars.ECR_REPOSITORY_NAME }}
+  LAMBDA_FUNCTION_NAME: ${{ vars.ECR_REPOSITORY_NAME }}
+  LAMBDA_ROLE_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-lambda-role
+
+jobs:
+  build:
+    permissions:
+      contents: read
+    name: Build
+    runs-on: ubuntu-latest
+    outputs:
+      sha-short: ${{ steps.sha_short.outputs.sha_short }}
+      artifact: ${{ steps.artifact_info.outputs.artifact }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Validate CLOUD_PROVIDER
+      run: |
+        case "${{ env.CLOUD_PROVIDER }}" in
+          azure|aws) echo "Cloud destino: ${{ env.CLOUD_PROVIDER }}" ;;
+          *) echo "❌ CLOUD_PROVIDER debe ser 'azure' o 'aws' (valor actual: '${{ env.CLOUD_PROVIDER }}')"; exit 1 ;;
+        esac
+
+    - name: Setup Python
+      uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+      with:
+        python-version: '3.13'
+        cache: 'pip'
+        cache-dependency-path: src/requirements.txt
+
+    - name: Install dependencies and check imports
+      working-directory: src
+      run: |
+        pip install -r requirements.txt
+        python -c "import app, function_app; print('✅ app y function_app importan correctamente')"
+
+    - name: Set SHA Short
+      id: sha_short
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    # --- Azure: paquete zip para Azure Functions (las dependencias se instalan con remote build) ---
+    - name: Package Azure Function
+      if: env.CLOUD_PROVIDER == 'azure'
+      working-directory: src
+      run: |
+        zip -r ../function-app.zip . -x 'Dockerfile' '.funcignore' '__pycache__/*' '*.pyc'
+        unzip -l ../function-app.zip
+
+    - name: Upload Azure Function package
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: function-app
+        path: function-app.zip
+        retention-days: 7
+
+    # --- AWS: imagen de contenedor en ECR para Lambda ---
+    - name: Configure AWS Credentials
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to ECR
+      if: env.CLOUD_PROVIDER == 'aws'
+      id: ecr
+      uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+    - name: Ensure ECR repository exists
+      if: env.CLOUD_PROVIDER == 'aws'
+      run: |
+        aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_NAME }} >/dev/null 2>&1 || \
+        aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_NAME }} --image-scanning-configuration scanOnPush=true
+
+    - name: Build and push to ECR
+      if: env.CLOUD_PROVIDER == 'aws'
+      run: |
+        IMAGE="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_NAME }}:${{ steps.sha_short.outputs.sha_short }}"
+        # Lambda necesita una imagen linux/amd64 de un solo manifiesto (sin attestations).
+        docker build --platform linux/amd64 --provenance=false --sbom=false -f src/Dockerfile -t "$IMAGE" src/
+        docker push "$IMAGE"
+        echo "IMAGE=$IMAGE" >> $GITHUB_ENV
+        echo "✅ Image built and pushed: $IMAGE"
+
+    - name: Set artifact output
+      id: artifact_info
+      run: |
+        if [ "${{ env.CLOUD_PROVIDER }}" == "azure" ]; then
+          echo "artifact=function-app.zip (Azure Functions, Python)" >> $GITHUB_OUTPUT
+        else
+          echo "artifact=$IMAGE" >> $GITHUB_OUTPUT
+        fi
+
+  release:
+    permissions:
+      contents: write
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      release-tag: ${{ steps.create_release.outputs.tag_name }}
+
+    steps:
+    - name: Generate release tag
+      id: tag_version
+      run: |
+        TAG="v$(date +'%Y%m%d')-${{ needs.build.outputs.sha-short }}"
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "Generated release tag: $TAG"
+
+    - name: Create GitHub Release
+      id: create_release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ steps.tag_version.outputs.tag }}
+        # Los datos van por env (no interpolados en el script) para evitar inyección
+        NOTES: |
+            ## 🚀 Reto DevSecOps Deployment - Python (Serverless)
+
+            ### 📋 Build Information:
+            - **Artifact**: `${{ needs.build.outputs.artifact }}`
+            - **Commit**: ${{ github.sha }}
+            - **Short SHA**: ${{ needs.build.outputs.sha-short }}
+            - **Author**: ${{ github.actor }}
+            - **Cloud Provider**: ${{ env.CLOUD_PROVIDER }}
+
+            ### 🔗 Links:
+            - [Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            - [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+      run: |
+        gh release create "$TAG" \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$GITHUB_SHA" \
+          --title "Release $TAG" \
+          --notes "$NOTES" \
+          --generate-notes
+        echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    permissions:
+      contents: read
+    name: Deploy (Serverless)
+    needs: [build, release]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    # --- Azure Functions ---
+    - name: Download Azure Function package
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+      with:
+        name: function-app
+
+    - name: Azure Login
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy to Azure Functions
+      if: env.CLOUD_PROVIDER == 'azure'
+      id: deploy_azure
+      run: |
+        az functionapp deployment source config-zip \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.FUNCTION_APP_NAME }} \
+          --src function-app.zip \
+          --build-remote true
+
+        HOST=$(az functionapp show \
+          --resource-group ${{ env.RESOURCE_GROUP }} \
+          --name ${{ env.FUNCTION_APP_NAME }} \
+          --query defaultHostName -o tsv)
+        echo "url=https://$HOST" >> $GITHUB_OUTPUT
+        echo "✅ Azure Function desplegada: https://$HOST"
+
+    # --- AWS Lambda ---
+    - name: Configure AWS Credentials
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Deploy to AWS Lambda
+      if: env.CLOUD_PROVIDER == 'aws'
+      id: deploy_aws
+      run: |
+        bash scripts/deploy-lambda.sh \
+          "${{ env.LAMBDA_FUNCTION_NAME }}" \
+          "${{ needs.build.outputs.artifact }}" \
+          "${{ env.LAMBDA_ROLE_NAME }}"
+
+    # --- Validación común ---
+    - name: Smoke test
+      run: bash scripts/smoke-test.sh "${{ steps.deploy_azure.outputs.url || steps.deploy_aws.outputs.url }}"
+
+    - name: Deployment summary
+      if: always()
+      run: |
+        URL="${{ steps.deploy_azure.outputs.url || steps.deploy_aws.outputs.url || 'pending' }}"
+        if [ "${{ env.CLOUD_PROVIDER }}" == "azure" ]; then SERVICE="Azure Functions (Flex Consumption)"; else SERVICE="AWS Lambda (Function URL)"; fi
+        echo "## 🚀 Deployment Summary - Python" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Cloud Provider | ${{ env.CLOUD_PROVIDER }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Servicio | $SERVICE |" >> $GITHUB_STEP_SUMMARY
+        echo "| Release | ${{ needs.release.outputs.release-tag }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Artefacto | \`${{ needs.build.outputs.artifact }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🌐 URLs de acceso" >> $GITHUB_STEP_SUMMARY
+        echo "| Endpoint | URL |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
+        echo "| App Python | $URL/ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Health check | $URL/health |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Respuesta esperada:** \`{\"message\": \"Hola ED Team\"}\`" >> $GITHUB_STEP_SUMMARY

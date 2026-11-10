@@ -1,0 +1,47 @@
+name: Infrastructure - Multi Cloud
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'create'
+        type: choice
+        options:
+        - create
+        - destroy
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+jobs:
+  trigger-both-clouds:
+    permissions:
+      actions: write
+      contents: read
+    name: Trigger ${{ inputs.action }} on AWS & Azure
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Trigger Azure infrastructure
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh workflow run infraestructure.yml \
+          --ref main \
+          -f cloud_provider=azure \
+          -f action=${{ inputs.action }}
+        echo "Azure ${{ inputs.action }} triggered"
+
+    - name: Trigger AWS infrastructure
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh workflow run infraestructure.yml \
+          --ref main \
+          -f cloud_provider=aws \
+          -f action=${{ inputs.action }}
+        echo "AWS ${{ inputs.action }} triggered"

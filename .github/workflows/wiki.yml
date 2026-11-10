@@ -1,0 +1,138 @@
+name: Publicar Wiki
+
+# Publica la carpeta doc/ en la Wiki de GitHub ("docs as code").
+# - validate: comprueba enlaces internos y que todos los diagramas Mermaid compilen (también en PRs).
+# - publish:  solo en main; clona <repo>.wiki.git, reemplaza su contenido y hace push.
+# Requisito previo: Wiki activada en Settings y una primera página creada a mano.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'doc/**'
+      - 'scripts/build-wiki.sh'
+      - '.github/workflows/wiki.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'doc/**'
+      - 'scripts/build-wiki.sh'
+      - '.github/workflows/wiki.yml'
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+concurrency:
+  group: wiki-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  MERMAID_CLI_VERSION: '12.0.0'
+
+jobs:
+  validate:
+    permissions:
+      contents: read
+    name: Validar documentación
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Generar wiki y comprobar enlaces
+      run: |
+        bash scripts/build-wiki.sh doc build/wiki \
+          "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}"
+
+    - name: Setup Node
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+      with:
+        node-version: '22'
+
+    - name: Validar diagramas Mermaid
+      run: |
+        # Chrome headless en runners Ubuntu recientes necesita --no-sandbox
+        echo '{"args":["--no-sandbox"]}' > "$RUNNER_TEMP/puppeteer.json"
+        mkdir -p "$RUNNER_TEMP/mermaid"
+        FAILED=0
+        TOTAL=0
+        for FILE in doc/*.md; do
+          grep -q '^```mermaid' "$FILE" || continue
+          TOTAL=$((TOTAL + 1))
+          if npx -y "@mermaid-js/mermaid-cli@${{ env.MERMAID_CLI_VERSION }}" \
+              --puppeteerConfigFile "$RUNNER_TEMP/puppeteer.json" \
+              --quiet \
+              -i "$FILE" -o "$RUNNER_TEMP/mermaid/$(basename "$FILE")"; then
+            echo "✅ $FILE"
+          else
+            echo "::error file=$FILE::Hay un diagrama Mermaid que no compila"
+            FAILED=$((FAILED + 1))
+          fi
+        done
+        echo "Archivos con diagramas: $TOTAL · con errores: $FAILED"
+        [ "$FAILED" -eq 0 ]
+
+    - name: Guardar vista previa de la wiki
+      uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      with:
+        name: wiki-preview
+        path: build/wiki
+        retention-days: 7
+
+  publish:
+    permissions:
+      contents: write
+    name: Publicar en la Wiki
+    needs: validate
+    if: github.event_name != 'pull_request' && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Generar wiki
+      run: |
+        bash scripts/build-wiki.sh doc build/wiki \
+          "${{ github.server_url }}/${{ github.repository }}/blob/${{ github.event.repository.default_branch }}"
+
+    - name: Clonar el repositorio de la wiki
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        WIKI_URL="${GITHUB_SERVER_URL/https:\/\//https://x-access-token:${GH_TOKEN}@}/${GITHUB_REPOSITORY}.wiki.git"
+        if ! git clone --depth 1 "$WIKI_URL" wiki 2>/dev/null; then
+          echo "::error::No se pudo clonar la wiki. Activa Settings → General → Features → Wikis y crea una primera página a mano en la pestaña Wiki."
+          exit 1
+        fi
+
+    - name: Sincronizar y publicar
+      id: push
+      run: |
+        # La wiki es un espejo de doc/: se borra todo lo anterior (excepto .git) y se copia lo generado
+        find wiki -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+        cp -R build/wiki/. wiki/
+
+        cd wiki
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add -A
+        if git diff --cached --quiet; then
+          echo "ℹ️ La wiki ya estaba actualizada"
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+        else
+          git diff --cached --stat
+          git commit -m "docs: publicar wiki desde ${GITHUB_SHA::7}"
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Resumen
+      run: |
+        echo "## 📖 Wiki" >> "$GITHUB_STEP_SUMMARY"
+        echo "" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Cambios publicados: **${{ steps.push.outputs.changed }}**" >> "$GITHUB_STEP_SUMMARY"
+        echo "- Páginas: $(find build/wiki -name '*.md' | wc -l)" >> "$GITHUB_STEP_SUMMARY"
+        echo "- URL: ${{ github.server_url }}/${{ github.repository }}/wiki" >> "$GITHUB_STEP_SUMMARY"

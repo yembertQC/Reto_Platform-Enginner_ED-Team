@@ -1,0 +1,230 @@
+name: CD - Go (Serverless)
+
+# Azure -> Azure Container Apps (imagen en ACR, escala a cero).
+# AWS   -> AWS Lambda con imagen de contenedor (ECR) + Lambda Web Adapter, expuesta con Function URL.
+# El cloud destino lo decide la variable de repositorio CLOUD_PROVIDER.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src-go/**'
+    branches: [ main ]
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+env:
+  CLOUD_PROVIDER: ${{ vars.CLOUD_PROVIDER }}
+  # Azure
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  REGISTRY_NAME: ${{ vars.REGISTRY_NAME }}
+  CONTAINER_NAME_GO: ${{ vars.CONTAINER_NAME }}-go
+  CONTAINERAPP_ENV_NAME: ${{ vars.CONTAINERAPP_ENV_NAME }}
+  # AWS
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-go
+  LAMBDA_FUNCTION_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-go
+  LAMBDA_ROLE_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-lambda-role
+
+jobs:
+  buildImage:
+    permissions:
+      contents: read
+    name: Build Image
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.image_info.outputs.image-tag }}
+      sha-short: ${{ steps.sha_short.outputs.sha_short }}
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Validate CLOUD_PROVIDER
+      run: |
+        case "${{ env.CLOUD_PROVIDER }}" in
+          azure|aws) echo "Cloud destino: ${{ env.CLOUD_PROVIDER }}" ;;
+          *) echo "❌ CLOUD_PROVIDER debe ser 'azure' o 'aws' (valor actual: '${{ env.CLOUD_PROVIDER }}')"; exit 1 ;;
+        esac
+
+    - name: Setup Go
+      uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+      with:
+        go-version: '1.23'
+        cache-dependency-path: src-go/go.mod
+
+    - name: Run tests
+      working-directory: src-go
+      run: go test -v -race ./...
+
+    - name: Set SHA Short
+      id: sha_short
+      run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    # --- Azure: ACR ---
+    - name: Azure Login
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Login to ACR
+      if: env.CLOUD_PROVIDER == 'azure'
+      run: |
+        az acr login --name ${{ env.REGISTRY_NAME }}
+        echo "IMAGE=${{ env.REGISTRY_NAME }}.azurecr.io/${{ env.CONTAINER_NAME_GO }}:${{ steps.sha_short.outputs.sha_short }}" >> $GITHUB_ENV
+
+    # --- AWS: ECR ---
+    - name: Configure AWS Credentials
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to ECR
+      if: env.CLOUD_PROVIDER == 'aws'
+      id: ecr
+      uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+
+    - name: Ensure ECR repository exists
+      if: env.CLOUD_PROVIDER == 'aws'
+      run: |
+        aws ecr describe-repositories --repository-names ${{ env.ECR_REPOSITORY_NAME }} >/dev/null 2>&1 || \
+        aws ecr create-repository --repository-name ${{ env.ECR_REPOSITORY_NAME }} --image-scanning-configuration scanOnPush=true
+        echo "IMAGE=${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPOSITORY_NAME }}:${{ steps.sha_short.outputs.sha_short }}" >> $GITHUB_ENV
+
+    # --- Build común ---
+    - name: Build and push image
+      run: |
+        # linux/amd64 de un solo manifiesto (sin attestations): requisito de Lambda, válido también en Container Apps.
+        docker build --platform linux/amd64 --provenance=false --sbom=false -f src-go/Dockerfile -t "$IMAGE" src-go/
+        docker push "$IMAGE"
+        echo "✅ Image built and pushed: $IMAGE"
+
+    - name: Set image info outputs
+      id: image_info
+      run: echo "image-tag=$IMAGE" >> $GITHUB_OUTPUT
+
+  release:
+    permissions:
+      contents: write
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: buildImage
+    outputs:
+      release-tag: ${{ steps.create_release.outputs.tag_name }}
+
+    steps:
+    - name: Generate release tag
+      id: tag_version
+      run: |
+        TAG="go-v$(date +'%Y%m%d')-${{ needs.buildImage.outputs.sha-short }}"
+        echo "tag=$TAG" >> $GITHUB_OUTPUT
+        echo "Generated release tag: $TAG"
+
+    - name: Create GitHub Release
+      id: create_release
+      env:
+        GH_TOKEN: ${{ github.token }}
+        TAG: ${{ steps.tag_version.outputs.tag }}
+        # Los datos van por env (no interpolados en el script) para evitar inyección
+        NOTES: |
+            ## Reto DevSecOps Deployment - Go (Serverless)
+
+            ### Build Information:
+            - **Image**: `${{ needs.buildImage.outputs.image-tag }}`
+            - **Commit**: ${{ github.sha }}
+            - **Short SHA**: ${{ needs.buildImage.outputs.sha-short }}
+            - **Author**: ${{ github.actor }}
+            - **Cloud Provider**: ${{ env.CLOUD_PROVIDER }}
+
+            ### Links:
+            - [Commit Details](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+            - [Workflow Run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+      run: |
+        gh release create "$TAG" \
+          --repo "$GITHUB_REPOSITORY" \
+          --target "$GITHUB_SHA" \
+          --title "Release Go $TAG" \
+          --notes "$NOTES" \
+          --generate-notes
+        echo "tag_name=$TAG" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    permissions:
+      contents: read
+    name: Deploy (Serverless)
+    needs: [buildImage, release]
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    # --- Azure Container Apps ---
+    - name: Azure Login
+      if: env.CLOUD_PROVIDER == 'azure'
+      uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Deploy to Azure Container Apps
+      if: env.CLOUD_PROVIDER == 'azure'
+      id: deploy_azure
+      run: |
+        bash scripts/deploy-containerapp.sh \
+          "${{ env.CONTAINER_NAME_GO }}" \
+          "${{ env.RESOURCE_GROUP }}" \
+          "${{ env.CONTAINERAPP_ENV_NAME }}" \
+          "${{ needs.buildImage.outputs.image-tag }}" \
+          "${{ env.REGISTRY_NAME }}" \
+          8080
+
+    # --- AWS Lambda ---
+    - name: Configure AWS Credentials
+      if: env.CLOUD_PROVIDER == 'aws'
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Deploy to AWS Lambda
+      if: env.CLOUD_PROVIDER == 'aws'
+      id: deploy_aws
+      run: |
+        bash scripts/deploy-lambda.sh \
+          "${{ env.LAMBDA_FUNCTION_NAME }}" \
+          "${{ needs.buildImage.outputs.image-tag }}" \
+          "${{ env.LAMBDA_ROLE_NAME }}"
+
+    # --- Validación común ---
+    - name: Smoke test
+      run: bash scripts/smoke-test.sh "${{ steps.deploy_azure.outputs.url || steps.deploy_aws.outputs.url }}"
+
+    - name: Deployment summary
+      if: always()
+      run: |
+        URL="${{ steps.deploy_azure.outputs.url || steps.deploy_aws.outputs.url || 'pending' }}"
+        if [ "${{ env.CLOUD_PROVIDER }}" == "azure" ]; then SERVICE="Azure Container Apps"; else SERVICE="AWS Lambda (Function URL)"; fi
+        echo "## 🚀 Deployment Summary - Go" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Campo | Valor |" >> $GITHUB_STEP_SUMMARY
+        echo "|-------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Cloud Provider | ${{ env.CLOUD_PROVIDER }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Servicio | $SERVICE |" >> $GITHUB_STEP_SUMMARY
+        echo "| Release | ${{ needs.release.outputs.release-tag }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Imagen | \`${{ needs.buildImage.outputs.image-tag }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🌐 URLs de acceso" >> $GITHUB_STEP_SUMMARY
+        echo "| Endpoint | URL |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-----|" >> $GITHUB_STEP_SUMMARY
+        echo "| App Go | $URL/ |" >> $GITHUB_STEP_SUMMARY
+        echo "| Health check | $URL/health |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "**Respuesta esperada:** \`{\"message\": \"Hola ED Team\"}\`" >> $GITHUB_STEP_SUMMARY

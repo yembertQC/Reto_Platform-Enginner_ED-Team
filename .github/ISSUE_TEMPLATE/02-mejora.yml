@@ -1,0 +1,48 @@
+name: ✨ Proponer una mejora
+description: Una idea para la plataforma, los pipelines, las apps o el curso.
+title: "[Mejora]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: ¿Qué problema resuelve?
+      description: Describe el dolor o la necesidad, no solo la solución.
+      placeholder: Cada vez que ... tengo que ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Propuesta
+      description: Cómo te imaginas la solución.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternativas consideradas
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Área
+      multiple: true
+      options:
+        - Apps (src/, src-go/)
+        - Pipelines CI/CD
+        - Infraestructura
+        - Seguridad
+        - Documentación / wiki
+        - Experiencia del desarrollador
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: contribute
+    attributes:
+      label: Contribución
+      options:
+        - label: Me gustaría implementarlo yo (ver CONTRIBUTING.md).

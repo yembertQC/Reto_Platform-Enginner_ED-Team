@@ -1,0 +1,394 @@
+name: Provision Infrastructure (Serverless)
+
+# Azure: ACR + Container Apps Environment (app Go) y Storage Account + Function App Flex Consumption (app Python).
+# AWS:   repositorios ECR (Python y Go) + rol IAM de ejecución para Lambda.
+# Las Container Apps y las funciones Lambda las crea el CD en el primer despliegue (necesitan una imagen ya publicada).
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud_provider:
+        description: 'Cloud provider'
+        required: true
+        default: 'azure'
+        type: choice
+        options:
+        - azure
+        - aws
+      action:
+        description: 'Action to perform'
+        required: true
+        default: 'create'
+        type: choice
+        options:
+        - create
+        - destroy
+
+env:
+  # Azure
+  RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+  AZURE_LOCATION: ${{ vars.AZURE_LOCATION }}
+  REGISTRY_NAME: ${{ vars.REGISTRY_NAME }}
+  CONTAINER_NAME_GO: ${{ vars.CONTAINER_NAME }}-go
+  CONTAINERAPP_ENV_NAME: ${{ vars.CONTAINERAPP_ENV_NAME }}
+  FUNCTION_APP_NAME: ${{ vars.FUNCTION_APP_NAME }}
+  STORAGE_ACCOUNT_NAME: ${{ vars.STORAGE_ACCOUNT_NAME }}
+  FUNCTION_PYTHON_VERSION: ${{ vars.FUNCTION_PYTHON_VERSION || '3.13' }}
+  # AWS
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  ECR_REPOSITORY_NAME: ${{ vars.ECR_REPOSITORY_NAME }}
+  LAMBDA_ROLE_NAME: ${{ vars.ECR_REPOSITORY_NAME }}-lambda-role
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+jobs:
+  # ==============================
+  # AZURE - Create Infrastructure
+  # ==============================
+  azure-create:
+    name: Azure - Create Infrastructure
+    if: ${{ inputs.cloud_provider == 'azure' && inputs.action == 'create' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Azure Login
+      uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Create Azure Infrastructure
+      run: |
+        set -euo pipefail
+        RG="${{ env.RESOURCE_GROUP }}"
+        LOC="${{ env.AZURE_LOCATION }}"
+
+        echo "=== CREATING AZURE SERVERLESS INFRASTRUCTURE ==="
+        echo "- Resource Group:            $RG (existente)"
+        echo "- ACR:                       ${{ env.REGISTRY_NAME }}"
+        echo "- Container Apps Environment: ${{ env.CONTAINERAPP_ENV_NAME }}"
+        echo "- Storage Account:           ${{ env.STORAGE_ACCOUNT_NAME }}"
+        echo "- Function App:              ${{ env.FUNCTION_APP_NAME }} (Python ${{ env.FUNCTION_PYTHON_VERSION }})"
+        echo "- Location:                  $LOC"
+        echo ""
+
+        # 1. Resource Group (debe existir)
+        if ! az group show --name "$RG" > /dev/null 2>&1; then
+          echo "❌ Resource Group not found: $RG"
+          az group list --query "[].{Name:name, Location:location}" -o table
+          exit 1
+        fi
+        echo "✅ Resource Group exists: $RG"
+
+        # 2. Proveedores de recursos (requiere permisos a nivel suscripción; si ya están registrados no hace falta)
+        for NS in Microsoft.App Microsoft.ContainerRegistry Microsoft.Web Microsoft.Storage; do
+          az provider register --namespace "$NS" --wait 2>/dev/null \
+            || echo "::warning::No se pudo registrar $NS (puede que ya esté registrado o falten permisos)"
+        done
+
+        az extension add --name containerapp --upgrade --only-show-errors
+
+        # 3. Azure Container Registry (imágenes de la app Go)
+        if az acr show --name "${{ env.REGISTRY_NAME }}" > /dev/null 2>&1; then
+          echo "⚠️ ACR already exists: ${{ env.REGISTRY_NAME }}"
+        else
+          az acr create \
+            --resource-group "$RG" \
+            --name "${{ env.REGISTRY_NAME }}" \
+            --location "$LOC" \
+            --sku Basic \
+            --admin-enabled true \
+            --only-show-errors > /dev/null
+          echo "✅ ACR created: ${{ env.REGISTRY_NAME }}"
+        fi
+
+        # 4. Container Apps Environment (sin Log Analytics para mantener costo y limpieza mínimos)
+        if az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          echo "⚠️ Container Apps Environment already exists: ${{ env.CONTAINERAPP_ENV_NAME }}"
+        else
+          az containerapp env create \
+            --name "${{ env.CONTAINERAPP_ENV_NAME }}" \
+            --resource-group "$RG" \
+            --location "$LOC" \
+            --logs-destination none \
+            --only-show-errors > /dev/null
+          echo "✅ Container Apps Environment created: ${{ env.CONTAINERAPP_ENV_NAME }}"
+        fi
+
+        # 5. Storage Account (requerido por Azure Functions)
+        if az storage account show --name "${{ env.STORAGE_ACCOUNT_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          echo "⚠️ Storage Account already exists: ${{ env.STORAGE_ACCOUNT_NAME }}"
+        else
+          az storage account create \
+            --name "${{ env.STORAGE_ACCOUNT_NAME }}" \
+            --resource-group "$RG" \
+            --location "$LOC" \
+            --sku Standard_LRS \
+            --allow-blob-public-access false \
+            --only-show-errors > /dev/null
+          echo "✅ Storage Account created: ${{ env.STORAGE_ACCOUNT_NAME }}"
+        fi
+
+        # 6. Function App en plan Flex Consumption (app Python)
+        if az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          echo "⚠️ Function App already exists: ${{ env.FUNCTION_APP_NAME }}"
+        else
+          az functionapp create \
+            --name "${{ env.FUNCTION_APP_NAME }}" \
+            --resource-group "$RG" \
+            --storage-account "${{ env.STORAGE_ACCOUNT_NAME }}" \
+            --flexconsumption-location "$LOC" \
+            --runtime python \
+            --runtime-version "${{ env.FUNCTION_PYTHON_VERSION }}" \
+            --disable-app-insights true \
+            --only-show-errors > /dev/null
+          echo "✅ Function App created: ${{ env.FUNCTION_APP_NAME }}"
+        fi
+
+        echo ""
+        echo "=== AZURE INFRASTRUCTURE CREATED SUCCESSFULLY ==="
+
+    - name: Generate Azure Summary
+      run: |
+        RG="${{ env.RESOURCE_GROUP }}"
+        ACR_SERVER=$(az acr show --name "${{ env.REGISTRY_NAME }}" --query loginServer -o tsv)
+        CAE_DOMAIN=$(az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" --query properties.defaultDomain -o tsv)
+        FUNC_HOST=$(az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" --query defaultHostName -o tsv)
+
+        echo "## 🎉 Azure Serverless Infrastructure Created" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| Resource Group | \`$RG\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| ACR | \`$ACR_SERVER\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Container Apps Environment | \`${{ env.CONTAINERAPP_ENV_NAME }}\` (\`$CAE_DOMAIN\`) |" >> $GITHUB_STEP_SUMMARY
+        echo "| Storage Account | \`${{ env.STORAGE_ACCOUNT_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Function App | \`https://$FUNC_HOST\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Location | ${{ env.AZURE_LOCATION }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "1. Variable \`CLOUD_PROVIDER\` = \`azure\`" >> $GITHUB_STEP_SUMMARY
+        echo "2. Push a \`src/\` (Python → Azure Functions) o \`src-go/\` (Go → Container App \`${{ env.CONTAINER_NAME_GO }}\`), o lanzar los CD manualmente" >> $GITHUB_STEP_SUMMARY
+
+  # ===============================
+  # AZURE - Destroy Infrastructure
+  # ===============================
+  azure-destroy:
+    name: Azure - Destroy Infrastructure
+    if: ${{ inputs.cloud_provider == 'azure' && inputs.action == 'destroy' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Azure Login
+      uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Destroy Azure Infrastructure
+      run: |
+        RG="${{ env.RESOURCE_GROUP }}"
+        echo "=== DESTROYING AZURE SERVERLESS INFRASTRUCTURE ==="
+        echo "📦 Resource Group '$RG' will NOT be deleted"
+        echo ""
+
+        if ! az group show --name "$RG" > /dev/null 2>&1; then
+          echo "❌ Resource Group doesn't exist: $RG"
+          exit 0
+        fi
+
+        az extension add --name containerapp --upgrade --only-show-errors
+
+        # Container App (Go)
+        if az containerapp show --name "${{ env.CONTAINER_NAME_GO }}" --resource-group "$RG" > /dev/null 2>&1; then
+          az containerapp delete --name "${{ env.CONTAINER_NAME_GO }}" --resource-group "$RG" --yes
+          echo "🗑️ Container App deleted: ${{ env.CONTAINER_NAME_GO }}"
+        else
+          echo "- Container App: Not found"
+        fi
+
+        # Container Apps Environment
+        if az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          az containerapp env delete --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" --yes
+          echo "🗑️ Container Apps Environment deleted: ${{ env.CONTAINERAPP_ENV_NAME }}"
+        else
+          echo "- Container Apps Environment: Not found"
+        fi
+
+        # Function App + su plan Flex Consumption
+        if az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          PLAN_ID=$(az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" --query serverFarmId -o tsv)
+          az functionapp delete --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG"
+          echo "🗑️ Function App deleted: ${{ env.FUNCTION_APP_NAME }}"
+          if [ -n "$PLAN_ID" ]; then
+            az resource delete --ids "$PLAN_ID" && echo "🗑️ Function plan deleted: $PLAN_ID"
+          fi
+        else
+          echo "- Function App: Not found"
+        fi
+
+        # Storage Account
+        if az storage account show --name "${{ env.STORAGE_ACCOUNT_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          az storage account delete --name "${{ env.STORAGE_ACCOUNT_NAME }}" --resource-group "$RG" --yes
+          echo "🗑️ Storage Account deleted: ${{ env.STORAGE_ACCOUNT_NAME }}"
+        else
+          echo "- Storage Account: Not found"
+        fi
+
+        # ACR
+        if az acr show --name "${{ env.REGISTRY_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
+          az acr delete --name "${{ env.REGISTRY_NAME }}" --resource-group "$RG" --yes
+          echo "🗑️ ACR deleted: ${{ env.REGISTRY_NAME }}"
+        else
+          echo "- ACR: Not found"
+        fi
+
+        echo ""
+        echo "✅ Azure cleanup completed"
+
+    - name: Generate Azure Cleanup Summary
+      run: |
+        echo "## 🗑️ Azure Serverless Infrastructure Cleanup" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Container App / Environment**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
+        echo "- **Function App / Plan / Storage Account**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
+        echo "- **ACR**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
+        echo "- **Resource Group**: ✅ Preserved" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================
+  # AWS - Create Infrastructure
+  # ===========================
+  aws-create:
+    name: AWS - Create Infrastructure
+    if: ${{ inputs.cloud_provider == 'aws' && inputs.action == 'create' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Create AWS Infrastructure
+      run: |
+        set -euo pipefail
+        echo "=== CREATING AWS SERVERLESS INFRASTRUCTURE ==="
+        echo "- ECR: ${{ env.ECR_REPOSITORY_NAME }} (Python), ${{ env.ECR_REPOSITORY_NAME }}-go (Go)"
+        echo "- IAM role: ${{ env.LAMBDA_ROLE_NAME }}"
+        echo "- Region: ${{ env.AWS_REGION }}"
+        echo ""
+
+        # 1. Repositorios ECR
+        for REPO in "${{ env.ECR_REPOSITORY_NAME }}" "${{ env.ECR_REPOSITORY_NAME }}-go"; do
+          if aws ecr describe-repositories --repository-names "$REPO" > /dev/null 2>&1; then
+            echo "⚠️ ECR repository already exists: $REPO"
+          else
+            aws ecr create-repository \
+              --repository-name "$REPO" \
+              --image-scanning-configuration scanOnPush=true > /dev/null
+            echo "✅ ECR repository created: $REPO"
+          fi
+        done
+
+        # 2. Rol de ejecución para Lambda (solo logs en CloudWatch)
+        if aws iam get-role --role-name "${{ env.LAMBDA_ROLE_NAME }}" > /dev/null 2>&1; then
+          echo "⚠️ IAM role already exists: ${{ env.LAMBDA_ROLE_NAME }}"
+        else
+          aws iam create-role \
+            --role-name "${{ env.LAMBDA_ROLE_NAME }}" \
+            --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"lambda.amazonaws.com"},"Action":"sts:AssumeRole"}]}' > /dev/null
+          aws iam attach-role-policy \
+            --role-name "${{ env.LAMBDA_ROLE_NAME }}" \
+            --policy-arn arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+          echo "✅ IAM role created: ${{ env.LAMBDA_ROLE_NAME }}"
+          echo "⏳ Waiting for IAM role propagation..."
+          sleep 15
+        fi
+
+        echo ""
+        echo "=== AWS INFRASTRUCTURE CREATED SUCCESSFULLY ==="
+
+    - name: Generate AWS Summary
+      run: |
+        AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+        ECR_REGISTRY="${AWS_ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+
+        echo "## 🎉 AWS Serverless Infrastructure Created" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| Resource | Value |" >> $GITHUB_STEP_SUMMARY
+        echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
+        echo "| ECR (Python) | \`$ECR_REGISTRY/${{ env.ECR_REPOSITORY_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| ECR (Go) | \`$ECR_REGISTRY/${{ env.ECR_REPOSITORY_NAME }}-go\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Lambda execution role | \`${{ env.LAMBDA_ROLE_NAME }}\` |" >> $GITHUB_STEP_SUMMARY
+        echo "| Region | ${{ env.AWS_REGION }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### 🔧 Next Steps" >> $GITHUB_STEP_SUMMARY
+        echo "1. Variable \`CLOUD_PROVIDER\` = \`aws\`" >> $GITHUB_STEP_SUMMARY
+        echo "2. Push a \`src/\` o \`src-go/\` (o lanzar los CD manualmente): el primer despliegue crea las Lambdas \`${{ env.ECR_REPOSITORY_NAME }}\` y \`${{ env.ECR_REPOSITORY_NAME }}-go\` con su Function URL" >> $GITHUB_STEP_SUMMARY
+
+  # ============================
+  # AWS - Destroy Infrastructure
+  # ============================
+  aws-destroy:
+    name: AWS - Destroy Infrastructure
+    if: ${{ inputs.cloud_provider == 'aws' && inputs.action == 'destroy' }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Destroy AWS Infrastructure
+      run: |
+        echo "=== DESTROYING AWS SERVERLESS INFRASTRUCTURE ==="
+        echo ""
+
+        for NAME in "${{ env.ECR_REPOSITORY_NAME }}" "${{ env.ECR_REPOSITORY_NAME }}-go"; do
+          # Lambda (su Function URL se elimina junto con la función)
+          if aws lambda get-function --function-name "$NAME" > /dev/null 2>&1; then
+            aws lambda delete-function --function-name "$NAME"
+            echo "🗑️ Lambda deleted: $NAME"
+          else
+            echo "- Lambda $NAME: Not found"
+          fi
+
+          # Logs de CloudWatch de la Lambda
+          aws logs delete-log-group --log-group-name "/aws/lambda/$NAME" 2>/dev/null \
+            && echo "🗑️ Log group deleted: /aws/lambda/$NAME"
+
+          # Repositorio ECR
+          if aws ecr describe-repositories --repository-names "$NAME" > /dev/null 2>&1; then
+            aws ecr delete-repository --repository-name "$NAME" --force > /dev/null
+            echo "🗑️ ECR repository deleted: $NAME"
+          else
+            echo "- ECR $NAME: Not found"
+          fi
+        done
+
+        # Rol IAM de Lambda
+        if aws iam get-role --role-name "${{ env.LAMBDA_ROLE_NAME }}" > /dev/null 2>&1; then
+          for POLICY_ARN in $(aws iam list-attached-role-policies --role-name "${{ env.LAMBDA_ROLE_NAME }}" \
+              --query "AttachedPolicies[].PolicyArn" --output text); do
+            aws iam detach-role-policy --role-name "${{ env.LAMBDA_ROLE_NAME }}" --policy-arn "$POLICY_ARN"
+          done
+          aws iam delete-role --role-name "${{ env.LAMBDA_ROLE_NAME }}"
+          echo "🗑️ IAM role deleted: ${{ env.LAMBDA_ROLE_NAME }}"
+        else
+          echo "- IAM role: Not found"
+        fi
+
+        echo ""
+        echo "✅ AWS cleanup completed"
+
+    - name: Generate AWS Cleanup Summary
+      run: |
+        echo "## 🗑️ AWS Serverless Infrastructure Cleanup" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "- **Lambdas + Function URLs + log groups**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
+        echo "- **ECR repositories**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
+        echo "- **Lambda IAM role**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
