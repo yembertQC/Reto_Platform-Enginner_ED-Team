@@ -1,6 +1,6 @@
 # 0 · ¿Qué es Ingeniería de Plataforma?
 
-> 🎯 **Objetivo:** entender qué es la Ingeniería de Plataforma, qué problema resuelve y por qué este proyecto es, en pequeño, una plataforma.
+> 🎯 **Objetivo:** entender qué es la Ingeniería de Plataforma, qué problema resuelve y qué lugar ocupa este proyecto: el punto de partida desde el que se construye una.
 
 ---
 
@@ -88,19 +88,19 @@ flowchart TB
 | Concepto | Qué significa | Ejemplo en este repo |
 |----------|---------------|----------------------|
 | **Plataforma como producto** | La plataforma tiene usuarios (los devs), se diseña escuchándolos, tiene documentación y se mejora por versiones | Esta wiki, el laboratorio, el job summary con la URL |
-| **Autoservicio** | El dev consigue lo que necesita **sin abrir un ticket** ni esperar a otra persona | `infraestructure.yml` → *Run workflow* → infra creada |
-| **Golden path** (camino dorado) | La forma recomendada, ya resuelta y segura, de hacer algo. Es **opcional pero tan cómoda** que todos la eligen | Push a `src-go/` → tests, escaneo, build, deploy y smoke test sin hacer nada más |
+| **Autoservicio** | El dev consigue lo que necesita **sin abrir un ticket** ni esperar a otra persona | A medias: `infraestructure.yml` → *Run workflow* crea la infra, pero dar de alta un servicio nuevo sigue siendo el [laboratorio](08-Laboratorio-Paso-a-Paso.md) manual |
+| **Golden path** (camino dorado) | La forma recomendada, ya resuelta y segura, de hacer algo. Es **opcional pero tan cómoda** que todos la eligen | Push a `src-go/` → tests, escaneo, build, deploy y smoke test sin hacer nada más. Es el golden path de **un** equipo: otro tendría que copiarlo |
 | **Abstracción** | Ocultar detalles que el dev no necesita, sin impedir verlos | `CLOUD_PROVIDER=azure` o `aws`: el dev no necesita saber los comandos de cada nube |
 | **Guardrails** (barandillas) | Controles automáticos que evitan errores graves sin frenar | CodeQL, Grype, environment `production` con aprobación |
 | **Reutilización** | Resolver una vez y usarlo en todas partes | `scripts/deploy-lambda.sh` lo usan 3 pipelines |
-| **Thinnest Viable Platform** | Empezar con la plataforma **más pequeña que aporte valor** y crecer según la demanda | Este repo: unos pocos workflows y scripts, no un portal gigante |
+| **Thinnest Viable Platform** | Empezar con la plataforma **más pequeña que aporte valor** y crecer según la demanda | El siguiente paso desde este repo es un pipeline compartido y un formulario, no un portal gigante |
 
 ### 🛤️ Golden path vs camino libre
 
 ```mermaid
 flowchart LR
     START["💡 Tengo una app nueva"]
-    START -->|"🛤️ Golden path"| GP1["Copio la estructura del repo"] --> GP2["git push"] --> GP3["✅ En producción<br/>segura y documentada<br/>en minutos"]
+    START -->|"🛤️ Golden path"| GP1["Creo mi repo<br/>desde la plantilla"] --> GP2["git push"] --> GP3["✅ En producción<br/>segura y documentada<br/>en minutos"]
     START -->|"🧗 Camino libre"| FP1["Investigo Lambda,<br/>Functions, IAM, ACR..."] --> FP2["Escribo mis scripts<br/>y pipelines"] --> FP3["Configuro seguridad<br/>(si me acuerdo)"] --> FP4["⏳ En producción<br/>en días o semanas"]
 
     classDef gp fill:#D5F5E3,stroke:#1E8449,color:#1a1a1a
@@ -112,6 +112,41 @@ flowchart LR
 ```
 
 > El camino libre **no se prohíbe** (a veces hace falta), pero el golden path es tan cómodo que es la opción natural.
+
+---
+
+## 🧭 ¿Dónde está este repo? El punto de partida
+
+Este repo **no es todavía una plataforma**: es el golden path de **un solo equipo**. El pipeline despliega solo, pero llegar hasta el pipeline es manual: hay que copiar el repo, crear los secretos y las variables, configurar el environment y lanzar la infraestructura (el [laboratorio](08-Laboratorio-Paso-a-Paso.md)). Y todo tiene un único dueño.
+
+Una plataforma madura por niveles. Este repo es el primero, y el curso construye los siguientes encima, en repos nuevos:
+
+```mermaid
+flowchart LR
+    REPO["📦 Este repo"]
+    N1["⌨️ Nivel 1 · A mano<br/>el pipeline despliega solo,<br/>pero pedir un servicio<br/>es un proceso manual"]
+    N2["🛤️ Nivel 2 · Golden path<br/>pipeline compartido y versionado,<br/>repo plantilla y equipos dueños"]
+    N3["🙋 Nivel 3 · Autoservicio<br/>un formulario crea el servicio,<br/>lo pida una persona<br/>o un agente de IA"]
+    N4["🛡️ Nivel 4 · Guardrails<br/>aprobaciones, acceso sin contraseñas<br/>y reglas en código"]
+
+    REPO -.->|"estás aquí"| N1
+    N1 --> N2 --> N3 --> N4
+
+    classDef repo fill:#FFE8A3,stroke:#B58900,color:#1a1a1a
+    classDef now fill:#FADBD8,stroke:#C0392B,color:#1a1a1a
+    classDef next fill:#D6EAF8,stroke:#2874A6,color:#1a1a1a
+    class REPO repo
+    class N1 now
+    class N2,N3,N4 next
+```
+
+| Nivel | Qué cambia | De qué pieza de este repo sale |
+|-------|-----------|--------------------------------|
+| 2 · Golden path | El pipeline deja de copiarse: vive en un repo y los demás lo llaman por versión | `cd-go.yml` y `scripts/` |
+| 2 · Golden path | Un servicio nuevo nace de una plantilla, ya conectado al pipeline | `src-go/` (sin los endpoints vulnerables) |
+| 2 · Golden path | Cada automatización tiene un equipo responsable | `.github/CODEOWNERS`, hoy con un solo dueño |
+| 3 · Autoservicio | El alta de un servicio se pide con un formulario y la ejecuta un programa | El laboratorio manual de las páginas 7 y 8 |
+| 4 · Guardrails | La nube se alcanza sin secretos guardados y las reglas se aplican a todos | Los tres secretos estáticos y el environment `production` |
 
 ---
 
@@ -177,7 +212,7 @@ flowchart TB
 
 | Capa | Qué ofrece | En este repo | Lo que faltaría en una empresa real |
 |------|-----------|--------------|-------------------------------------|
-| 🖥️ Interfaz para devs | Dónde se piden las cosas | GitHub Actions (*Run workflow*) + wiki | Un portal (Backstage, Port...) con catálogo de servicios |
+| 🖥️ Interfaz para devs | Dónde se piden las cosas | GitHub Actions (*Run workflow*) + wiki | Un formulario de solicitud (IssueOps) o un portal (Backstage, Port...) con catálogo de servicios |
 | 🛤️ Integración y entrega | Pipelines estándar | `ci*.yml`, `cd*.yml` | Workflows reutilizables (`workflow_call`) versionados para todos los repos |
 | 🏗️ Infraestructura | Recursos bajo demanda | `infraestructure.yml` con CLI | IaC declarativa con estado (Terraform, Bicep, Pulumi) |
 | 🛡️ Seguridad | Guardrails | CodeQL, Grype, SCA, aprobaciones | OIDC en vez de claves fijas, políticas (OPA, Azure Policy), firma de imágenes |
@@ -206,7 +241,8 @@ Y además, la **experiencia del desarrollador**: ¿la gente **elige** usar la pl
 
 - **Ingeniería de Plataforma** = construir una **plataforma interna de autoservicio**, tratada como **producto**, que reduce la carga cognitiva de los equipos.
 - Sus herramientas son los **golden paths**, la **abstracción**, los **guardrails** y la **documentación**.
-- Este repo es una **plataforma mínima**: pipelines estándar, scripts reutilizables, multi-cloud con una variable, seguridad por defecto y docs como código.
+- Este repo es el **punto de partida**: el golden path de un solo equipo (pipelines estándar, scripts reutilizables, multi-cloud con una variable, seguridad por defecto y docs como código).
+- Lo que le falta para ser plataforma (pipeline compartido, autoservicio, dueños por equipo y guardrails para todos) se construye encima, a partir de sus piezas.
 - Igual de importante es saber **qué no hacer**: ver [13 · ⛔ Qué NO hacer](13-Que-NO-hacer.md).
 
 ➡️ Siguiente: [1 · Introducción a Serverless](01-Introduccion-Serverless.md)

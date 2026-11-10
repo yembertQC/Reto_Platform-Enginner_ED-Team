@@ -4,7 +4,7 @@
 
 **DevSecOps** = meter la **seguridad** dentro del ciclo de desarrollo, de forma automática, en vez de dejarla para el final.
 
-> 🛠️ **En clave de plataforma:** este CI es la capa de **seguridad por defecto** del *golden path* ([página 0](00-Ingenieria-de-Plataforma.md)). Ningún equipo tiene que configurar CodeQL ni Grype: al usar la plataforma, los escaneos vienen incluidos.
+> 🛠️ **En clave de plataforma:** este CI es la capa de **seguridad por defecto** del *golden path* ([página 0](00-Ingenieria-de-Plataforma.md)). Ningún equipo tiene que configurar CodeQL ni Grype: quien sigue el golden path recibe los escaneos incluidos.
 
 ---
 

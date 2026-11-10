@@ -156,12 +156,38 @@ docker-compose.override.yml
 .history/
 
 # -----------------------------------------------------------------------------
-# 🤖 Claude Code (la configuración compartida sí se sube; la personal no)
+# 🤖 Herramientas y asistentes de IA (Claude, Cursor, Copilot, Gemini, etc.)
 # -----------------------------------------------------------------------------
-.claude/settings.local.json
+# Claude Code / Anthropic
+CLAUDE.md
+claude.md
 CLAUDE.local.md
-# Archivos que genera Claude en local (carpeta completa con todo su contenido)
+claude.local.md
+.claude/
 Claude outputs/
+claude_outputs/
+
+# Cursor
+.cursor/
+.cursorrules
+
+# GitHub Copilot & OpenAI
+.copilot/
+.copilot-instructions.md
+.openai/
+.chatgpt/
+
+# Google Gemini / Antigravity
+.gemini/
+.antigravity/
+
+# Windsurf / Codeium
+.windsurf/
+.codeium/
+
+# Aider & Continue
+.aider*
+.continue/
 
 # -----------------------------------------------------------------------------
 # 💻 Sistema operativo

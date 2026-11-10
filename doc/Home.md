@@ -2,7 +2,7 @@
 
 Bienvenido/a a la wiki del curso. En este proyecto vas a ver **cómo una aplicación pasa del código a internet de forma automática y segura**, desplegándose en servicios **serverless** de **Azure** y **AWS** con **GitHub Actions**.
 
-> 🛠️ **¿Qué es esto de Ingeniería de Plataforma?** Construir un **camino fácil, seguro y de autoservicio** para que cualquier equipo lleve su app a producción sin tener que ser experto en todo. Este proyecto es una plataforma en miniatura. Empieza por [0 · ¿Qué es Ingeniería de Plataforma?](00-Ingenieria-de-Plataforma.md).
+> 🛠️ **¿Qué es esto de Ingeniería de Plataforma?** Construir un **camino fácil, seguro y de autoservicio** para que cualquier equipo lleve su app a producción sin tener que ser experto en todo. Este proyecto es el **punto de partida**: el golden path de **un solo equipo**. Funciona, pero cada equipo nuevo tendría que copiarlo y configurarlo a mano; convertirlo en una plataforma para muchos es lo que se construye en el curso. Empieza por [0 · ¿Qué es Ingeniería de Plataforma?](00-Ingenieria-de-Plataforma.md).
 >
 > ⛔ Y tan importante como saber hacer es saber **qué no hacer**: [13 · Qué NO hacer](13-Que-NO-hacer.md).
 
@@ -67,7 +67,7 @@ Sigue las páginas en orden la primera vez:
 
 | # | Página | Qué aprendes |
 |---|--------|--------------|
-| 0 | [¿Qué es Ingeniería de Plataforma?](00-Ingenieria-de-Plataforma.md) | Qué problema resuelve, golden paths, autoservicio, DevOps vs SRE vs Plataforma, métricas DORA |
+| 0 | [¿Qué es Ingeniería de Plataforma?](00-Ingenieria-de-Plataforma.md) | Qué problema resuelve, golden paths, autoservicio, DevOps vs SRE vs Plataforma, métricas DORA y dónde encaja este repo |
 | 1 | [Introducción a Serverless](01-Introduccion-Serverless.md) | Qué es serverless, cold start, escalar a cero, comparación con Kubernetes |
 | 2 | [Arquitectura](02-Arquitectura.md) | Cómo encajan todas las piezas |
 | 3 | [Aplicaciones](03-Aplicaciones.md) | El código, los Dockerfiles y el truco del Lambda Web Adapter |

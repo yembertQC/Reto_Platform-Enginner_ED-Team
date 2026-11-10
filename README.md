@@ -1,19 +1,22 @@
 # Reto Platform Engineering - ED Team
 
-Una **plataforma interna de desarrollo (IDP) en miniatura** construida sobre GitHub Actions: un *golden path* de autoservicio que lleva cualquier app del `git push` a una URL pública en servicios **serverless** de Azure y AWS, con la seguridad incluida por defecto y sin clusters que administrar. Dos APIs mínimas (Python Flask y Go) hacen de "equipos de producto" que consumen la plataforma.
+El **punto de partida** del curso de Platform Engineering: el *golden path* de **un solo equipo**. Los pipelines de GitHub Actions llevan dos APIs mínimas (Python Flask y Go) del `git push` a una URL pública en servicios **serverless** de Azure y AWS, con la seguridad incluida por defecto y sin clusters que administrar.
+
+Funciona, pero todavía **no es una plataforma**: para que otro equipo lo use tendría que copiar el repo y repetir a mano toda la configuración. Convertirlo en una plataforma interna de autoservicio para muchos equipos es lo que se construye en el curso, en repos nuevos y a partir de las piezas de este.
 
 > 📖 **Toda la documentación (con diagramas) está en [`doc/`](doc/Home.md)** y se publica automáticamente en la Wiki del repositorio. Si eres estudiante, empieza por [¿Qué es Ingeniería de Plataforma?](doc/00-Ingenieria-de-Plataforma.md) y luego el [laboratorio paso a paso](doc/08-Laboratorio-Paso-a-Paso.md).
 
-## Qué ofrece la plataforma
+## De este repo a una plataforma
 
-| Capacidad | Cómo la entrega este repo |
-|-----------|---------------------------|
-| 🛤️ **Golden path** de despliegue | `cd.yml` / `cd-go.yml`: build → release → deploy → smoke test, igual para cualquier app |
-| 🙋 **Autoservicio** | El equipo solo hace `git push`; infraestructura con un clic (`infraestructure.yml`) |
-| ☁️ **Multi-cloud con una variable** | `CLOUD_PROVIDER=azure\|aws`, o los dos a la vez con `cd-go-multicloud.yml` |
-| 🛡️ **Seguridad por defecto** (DevSecOps) | CI con SAST (CodeQL), SCA y escaneo de imagen (Grype) en cada cambio |
-| 🧱 **Bloques reutilizables** | `scripts/` idempotentes que comparten los tres CD |
-| 📚 **Plataforma como producto** | Docs como código publicadas en la Wiki, laboratorio y plantillas de issues |
+| | Lo que este repo ya resuelve | Lo que le falta para servir a muchos equipos |
+|---|------------------------------|-----------------------------------------------|
+| 🛤️ **Despliegue** | `cd.yml` / `cd-go.yml`: build → release → deploy → smoke test en cada push | Un pipeline **compartido y versionado** (`workflow_call`) que los demás repos llamen en vez de copiarlo |
+| 🙋 **Alta de un servicio** | El [laboratorio](doc/08-Laboratorio-Paso-a-Paso.md): secrets, variables, environment e infraestructura, paso a paso y a mano | **Autoservicio**: un repo plantilla y un formulario de issue que crea el servicio, lo pida una persona o un agente de IA |
+| 👥 **Dueños** | `CODEOWNERS` con una sola persona dueña de todo | Un equipo de plataforma y equipos de producto, cada uno dueño de lo suyo |
+| 🔐 **Acceso a la nube** | Tres secretos estáticos guardados en el repo | Identidad federada (**OIDC**), sin contraseñas guardadas |
+| 🛡️ **Seguridad** | CI DevSecOps con SAST (CodeQL), SCA y escaneo de imagen (Grype); aprobación manual en `production` | Reglas en código que se aplican igual a todos los repos, los toque una persona o un agente |
+
+Lo que la plataforma reutiliza tal cual: los `scripts/` idempotentes que comparten los tres CD, el cambio de nube con una variable (`CLOUD_PROVIDER=azure|aws`) y la imagen única con Lambda Web Adapter.
 
 ## APIs
 
