@@ -137,7 +137,7 @@ jobs:
       run: |
         RG="${{ env.RESOURCE_GROUP }}"
         CAE_DOMAIN=$(az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" --query properties.defaultDomain -o tsv)
-        FUNC_HOST=$(az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" --query defaultHostName -o tsv)
+        FUNC_HOST=$(az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" --query properties.defaultHostName -o tsv)
 
         echo "## 🎉 Azure Serverless Infrastructure Created" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY

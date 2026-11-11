@@ -191,10 +191,15 @@ jobs:
           --src function-app.zip \
           --build-remote true
 
+        # En Flex Consumption el host está en properties.defaultHostName (defaultHostName viene vacío)
         HOST=$(az functionapp show \
           --resource-group ${{ env.RESOURCE_GROUP }} \
           --name ${{ env.FUNCTION_APP_NAME }} \
-          --query defaultHostName -o tsv)
+          --query properties.defaultHostName -o tsv)
+        if [ -z "$HOST" ]; then
+          echo "::error::No se pudo obtener el host de la Function App ${{ env.FUNCTION_APP_NAME }}"
+          exit 1
+        fi
         echo "url=https://$HOST" >> $GITHUB_OUTPUT
         echo "✅ Azure Function desplegada: https://$HOST"
 

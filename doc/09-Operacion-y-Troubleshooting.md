@@ -9,7 +9,7 @@
 ```bash
 # ⚡ Azure Functions (Python)
 az functionapp show -g <RESOURCE_GROUP> -n <FUNCTION_APP_NAME> \
-  --query "{url:defaultHostName, estado:state}"
+  --query "{url:properties.defaultHostName, estado:properties.state}"
 
 # 🐳 Azure Container Apps (Go)
 az containerapp show -g <RESOURCE_GROUP> -n <CONTAINER_NAME>-go \
