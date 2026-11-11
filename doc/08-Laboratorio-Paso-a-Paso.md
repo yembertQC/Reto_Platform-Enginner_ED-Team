@@ -153,7 +153,7 @@ git push
 
 ## 9️⃣ Limpia todo 🧹
 
-**Actions → Infrastructure - Multi Cloud → Run workflow → action: `destroy`**.
+**Actions → Destroy - Toda la infraestructura → Run workflow** → `cloud`: `ambos` · `confirmar`: `ELIMINAR`.
 
 > ✅ **Checkpoint final:** en el portal de Azure tu Resource Group está vacío (o solo con lo que ya tenías) y en AWS no quedan Lambdas ni el rol IAM del curso. Las imágenes de GHCR no se borran solas: si quieres, elimínalas desde **Packages → `<CONTAINER_NAME>-go` → Package settings → Delete this package**.
 

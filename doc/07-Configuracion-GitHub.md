@@ -120,6 +120,7 @@ Archivos de referencia: [azure-variables-example.json](azure-variables-example.j
 | `cd-go-multicloud.yml` | Las de Azure **y** las de AWS |
 | `infraestructure.yml` | Las de la nube elegida |
 | `infra-multicloud.yml` | Las de Azure **y** las de AWS |
+| `destroy-all.yml` | Las de la nube elegida (con `ambos`, las de AWS son opcionales: si faltan, se salta AWS) |
 | `wiki.yml` | Ninguna (usa `GITHUB_TOKEN`) |
 
 ---

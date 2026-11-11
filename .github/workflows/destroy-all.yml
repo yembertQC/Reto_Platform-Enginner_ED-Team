@@ -1,0 +1,128 @@
+name: Destroy - Toda la infraestructura
+
+# Borra en un solo run todo lo que crean infraestructure.yml y los tres CD:
+#   Azure: Container App (Go), Container Apps Environment, Function App (Python) y su plan Flex, Storage Account.
+#   AWS:   Lambdas <LAMBDA_NAME> y <LAMBDA_NAME>-go (con sus Function URLs), sus log groups y el rol IAM.
+# Conserva el Resource Group y las imágenes de GHCR (ver doc/13-Que-NO-hacer.md).
+# La lógica vive en scripts/destroy-azure.sh y scripts/destroy-aws.sh, los mismos que usa infraestructure.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      cloud:
+        description: 'Qué cloud limpiar'
+        required: true
+        default: 'ambos'
+        type: choice
+        options:
+        - ambos
+        - azure
+        - aws
+      confirmar:
+        description: 'Escribe ELIMINAR para confirmar el borrado'
+        required: true
+        type: string
+
+# Sin permisos por defecto: cada job declara solo los que necesita
+permissions: {}
+
+# Un solo destroy a la vez; si se lanza otro, espera en lugar de cancelar el que está borrando
+concurrency:
+  group: destroy-all
+  cancel-in-progress: false
+
+jobs:
+  confirm:
+    name: Confirmar el borrado
+    runs-on: ubuntu-latest
+    steps:
+    - name: Comprobar la confirmación
+      env:
+        CONFIRMAR: ${{ inputs.confirmar }}
+        CLOUD: ${{ inputs.cloud }}
+      run: |
+        if [ "$CONFIRMAR" != "ELIMINAR" ]; then
+          echo "::error::Para borrar la infraestructura escribe ELIMINAR (en mayúsculas) en el campo de confirmación"
+          exit 1
+        fi
+        echo "Confirmado: se borra la infraestructura de '$CLOUD'"
+
+  azure:
+    name: Azure - Destroy
+    needs: confirm
+    if: inputs.cloud == 'ambos' || inputs.cloud == 'azure'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Azure Login
+      uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    - name: Destroy Azure Infrastructure
+      env:
+        RESOURCE_GROUP: ${{ vars.RESOURCE_GROUP }}
+        CONTAINER_APP: ${{ vars.CONTAINER_NAME }}-go
+        CONTAINERAPP_ENV_NAME: ${{ vars.CONTAINERAPP_ENV_NAME }}
+        FUNCTION_APP_NAME: ${{ vars.FUNCTION_APP_NAME }}
+        STORAGE_ACCOUNT_NAME: ${{ vars.STORAGE_ACCOUNT_NAME }}
+      run: |
+        bash scripts/destroy-azure.sh \
+          "$RESOURCE_GROUP" \
+          "$CONTAINER_APP" \
+          "$CONTAINERAPP_ENV_NAME" \
+          "$FUNCTION_APP_NAME" \
+          "$STORAGE_ACCOUNT_NAME"
+
+  aws:
+    name: AWS - Destroy
+    needs: confirm
+    if: inputs.cloud == 'ambos' || inputs.cloud == 'aws'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+    # Con "ambos", si AWS aún no está configurado se salta con un aviso en lugar de fallar el run
+    - name: Comprobar la configuración de AWS
+      id: check
+      env:
+        AWS_REGION: ${{ vars.AWS_REGION }}
+        LAMBDA_NAME: ${{ vars.LAMBDA_NAME }}
+        CLOUD: ${{ inputs.cloud }}
+      run: |
+        if [ -z "$AWS_REGION" ] || [ -z "$LAMBDA_NAME" ] || [ "$AWS_REGION" = "PENDIENTE" ] || [ "$LAMBDA_NAME" = "PENDIENTE" ]; then
+          if [ "$CLOUD" = "aws" ]; then
+            echo "::error::Faltan las variables AWS_REGION y/o LAMBDA_NAME (vacías o PENDIENTE)"
+            exit 1
+          fi
+          echo "::warning::AWS no está configurado (AWS_REGION/LAMBDA_NAME vacías o PENDIENTE): se salta la limpieza de AWS"
+          echo "## ⏭️ AWS · limpieza saltada (sin configurar)" >> "$GITHUB_STEP_SUMMARY"
+          echo "skip=true" >> "$GITHUB_OUTPUT"
+        else
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Checkout
+      if: steps.check.outputs.skip == 'false'
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+    - name: Configure AWS Credentials
+      if: steps.check.outputs.skip == 'false'
+      uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ vars.AWS_REGION }}
+
+    - name: Destroy AWS Infrastructure
+      if: steps.check.outputs.skip == 'false'
+      env:
+        LAMBDA_NAME: ${{ vars.LAMBDA_NAME }}
+        LAMBDA_ROLE_NAME: ${{ vars.LAMBDA_NAME }}-lambda-role
+      run: bash scripts/destroy-aws.sh "$LAMBDA_NAME" "$LAMBDA_ROLE_NAME"

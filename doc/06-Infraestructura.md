@@ -10,12 +10,14 @@
 |----------|---------------|------------|
 | [`infraestructure.yml`](../.github/workflows/infraestructure.yml) | Manual (Actions → *Provision Infrastructure (Serverless)* → Run workflow) | `cloud_provider`: `azure` / `aws` · `action`: `create` / `destroy` |
 | [`infra-multicloud.yml`](../.github/workflows/infra-multicloud.yml) | Manual | `action`: `create` / `destroy`. Lanza `infraestructure.yml` para **Azure y AWS** a la vez |
+| [`destroy-all.yml`](../.github/workflows/destroy-all.yml) | Manual (Actions → *Destroy - Toda la infraestructura*) | `cloud`: `ambos` / `azure` / `aws` · `confirmar`: hay que escribir `ELIMINAR`. Borra **todo** en un solo run; con `ambos`, si AWS no está configurado lo salta con un aviso |
 
 ```mermaid
 flowchart LR
     YOU["👩‍💻 Run workflow"]
     YOU --> MC["infra-multicloud.yml<br/>create o destroy"]
     YOU --> ONE["infraestructure.yml<br/>nube + acción"]
+    YOU --> DA["destroy-all.yml<br/>todo · escribe ELIMINAR"]
     MC -->|"gh workflow run<br/>cloud = azure"| ONE
     MC -->|"gh workflow run<br/>cloud = aws"| ONE
 
@@ -23,13 +25,16 @@ flowchart LR
     ONE --> AZD["🗑️ azure-destroy"]
     ONE --> AWC["☁️ aws-create"]
     ONE --> AWD["🗑️ aws-destroy"]
+    DA --> SC["scripts/destroy-azure.sh<br/>scripts/destroy-aws.sh"]
+    AZD --> SC
+    AWD --> SC
 
     classDef you fill:#FFE8A3,stroke:#B58900,color:#1a1a1a
     classDef wf fill:#E3E3E3,stroke:#555,color:#1a1a1a
     classDef azure fill:#D4E6F1,stroke:#0078D4,color:#1a1a1a
     classDef aws fill:#FDEBD0,stroke:#FF9900,color:#1a1a1a
     class YOU you
-    class MC,ONE wf
+    class MC,ONE,DA,SC wf
     class AZC,AZD azure
     class AWC,AWD aws
 ```
@@ -108,7 +113,7 @@ flowchart TB
 
 > 💡 Se desactivan **Log Analytics** y **Application Insights** para que el entorno sea barato y el `destroy` no deje recursos sueltos. Para el curso basta con los logs en streaming (ver [9 · Operación](09-Operacion-y-Troubleshooting.md)).
 
-`azure-destroy` borra, en orden: Container App → Environment → Function App y su plan → Storage Account. **El Resource Group se conserva.** Las imágenes de GHCR **tampoco se borran**: si quieres eliminarlas, hazlo desde la pestaña *Packages* de GitHub.
+`azure-destroy` (y `destroy-all.yml`) llaman a [`destroy-azure.sh`](../scripts/destroy-azure.sh), que borra, en orden: Container App → Environment → Function App y su plan Flex → Storage Account. También borra los planes Flex Consumption que hayan quedado vacíos en el RG. Al final lista en el *summary* lo que siga en el Resource Group, por si quedó algo. **El Resource Group se conserva.** Las imágenes de GHCR **tampoco se borran**: si quieres eliminarlas, hazlo desde la pestaña *Packages* de GitHub.
 
 ---
 
@@ -142,7 +147,7 @@ flowchart TB
 
 Las Lambdas (con su paquete zip, la layer del Lambda Web Adapter y su Function URL) las crea el primer CD con [`deploy-lambda.sh`](../scripts/deploy-lambda.sh). La layer no se crea: la publica AWS en su cuenta `753240598075` y la función solo la referencia.
 
-`aws-destroy` borra: las dos Lambdas (y con ellas sus Function URLs) → sus log groups → el rol IAM.
+`aws-destroy` (y `destroy-all.yml`) llaman a [`destroy-aws.sh`](../scripts/destroy-aws.sh), que borra: las dos Lambdas (y con ellas sus Function URLs) → sus log groups → el rol IAM (antes le quita sus políticas).
 
 > 🧠 **Mínimo privilegio:** el rol de las Lambdas solo puede **escribir logs**. Si tu app no necesita nada más, no le des nada más.
 
@@ -158,6 +163,6 @@ Las Lambdas (con su paquete zip, la layer del Lambda Web Adapter y su Function U
 | Storage Account | Céntimos por lo almacenado |
 | GHCR (paquete público) | No: GitHub Packages es gratuito para paquetes públicos |
 
-> ✅ **Buena práctica del curso:** cuando termines una sesión, ejecuta `infra-multicloud.yml` con `destroy`.
+> ✅ **Buena práctica del curso:** cuando termines una sesión, ejecuta `destroy-all.yml` (`cloud`: `ambos`, `confirmar`: `ELIMINAR`). Los dos scripts son idempotentes: si algo falla a medias, relánzalo.
 
 ➡️ Siguiente: [7 · Configuración de GitHub](07-Configuracion-GitHub.md)

@@ -161,74 +161,27 @@ jobs:
     name: Azure - Destroy Infrastructure
     if: ${{ inputs.cloud_provider == 'azure' && inputs.action == 'destroy' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
     - name: Azure Login
       uses: Azure/login@7184910d9eb2b1c5e48f7073824a90609bb9b6d6 # v2.3.1
       with:
         creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+    # Misma lógica que destroy-all.yml; conserva el Resource Group y las imágenes de GHCR
     - name: Destroy Azure Infrastructure
       run: |
-        RG="${{ env.RESOURCE_GROUP }}"
-        echo "=== DESTROYING AZURE SERVERLESS INFRASTRUCTURE ==="
-        echo "📦 Resource Group '$RG' will NOT be deleted"
-        echo ""
-
-        if ! az group show --name "$RG" > /dev/null 2>&1; then
-          echo "❌ Resource Group doesn't exist: $RG"
-          exit 0
-        fi
-
-        az extension add --name containerapp --upgrade --only-show-errors
-
-        # Container App (Go)
-        if az containerapp show --name "${{ env.CONTAINER_NAME_GO }}" --resource-group "$RG" > /dev/null 2>&1; then
-          az containerapp delete --name "${{ env.CONTAINER_NAME_GO }}" --resource-group "$RG" --yes
-          echo "🗑️ Container App deleted: ${{ env.CONTAINER_NAME_GO }}"
-        else
-          echo "- Container App: Not found"
-        fi
-
-        # Container Apps Environment
-        if az containerapp env show --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
-          az containerapp env delete --name "${{ env.CONTAINERAPP_ENV_NAME }}" --resource-group "$RG" --yes
-          echo "🗑️ Container Apps Environment deleted: ${{ env.CONTAINERAPP_ENV_NAME }}"
-        else
-          echo "- Container Apps Environment: Not found"
-        fi
-
-        # Function App + su plan Flex Consumption
-        if az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
-          PLAN_ID=$(az functionapp show --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG" --query serverFarmId -o tsv)
-          az functionapp delete --name "${{ env.FUNCTION_APP_NAME }}" --resource-group "$RG"
-          echo "🗑️ Function App deleted: ${{ env.FUNCTION_APP_NAME }}"
-          if [ -n "$PLAN_ID" ]; then
-            az resource delete --ids "$PLAN_ID" && echo "🗑️ Function plan deleted: $PLAN_ID"
-          fi
-        else
-          echo "- Function App: Not found"
-        fi
-
-        # Storage Account
-        if az storage account show --name "${{ env.STORAGE_ACCOUNT_NAME }}" --resource-group "$RG" > /dev/null 2>&1; then
-          az storage account delete --name "${{ env.STORAGE_ACCOUNT_NAME }}" --resource-group "$RG" --yes
-          echo "🗑️ Storage Account deleted: ${{ env.STORAGE_ACCOUNT_NAME }}"
-        else
-          echo "- Storage Account: Not found"
-        fi
-
-        echo ""
-        echo "✅ Azure cleanup completed"
-
-    - name: Generate Azure Cleanup Summary
-      run: |
-        echo "## 🗑️ Azure Serverless Infrastructure Cleanup" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Container App / Environment**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
-        echo "- **Function App / Plan / Storage Account**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
-        echo "- **Resource Group**: ✅ Preserved" >> $GITHUB_STEP_SUMMARY
-        echo "- **Imágenes en GHCR**: ✅ Preserved (se borran desde la pestaña Packages de GitHub)" >> $GITHUB_STEP_SUMMARY
+        bash scripts/destroy-azure.sh \
+          "${{ env.RESOURCE_GROUP }}" \
+          "${{ env.CONTAINER_NAME_GO }}" \
+          "${{ env.CONTAINERAPP_ENV_NAME }}" \
+          "${{ env.FUNCTION_APP_NAME }}" \
+          "${{ env.STORAGE_ACCOUNT_NAME }}"
 
   # ===========================
   # AWS - Create Infrastructure
@@ -293,8 +246,13 @@ jobs:
     name: AWS - Destroy Infrastructure
     if: ${{ inputs.cloud_provider == 'aws' && inputs.action == 'destroy' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
 
     steps:
+    - name: Checkout
+      uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4.3.1
       with:
@@ -302,43 +260,6 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
 
+    # Misma lógica que destroy-all.yml
     - name: Destroy AWS Infrastructure
-      run: |
-        echo "=== DESTROYING AWS SERVERLESS INFRASTRUCTURE ==="
-        echo ""
-
-        for NAME in "${{ env.LAMBDA_NAME }}" "${{ env.LAMBDA_NAME }}-go"; do
-          # Lambda (su Function URL se elimina junto con la función)
-          if aws lambda get-function --function-name "$NAME" > /dev/null 2>&1; then
-            aws lambda delete-function --function-name "$NAME"
-            echo "🗑️ Lambda deleted: $NAME"
-          else
-            echo "- Lambda $NAME: Not found"
-          fi
-
-          # Logs de CloudWatch de la Lambda
-          aws logs delete-log-group --log-group-name "/aws/lambda/$NAME" 2>/dev/null \
-            && echo "🗑️ Log group deleted: /aws/lambda/$NAME"
-        done
-
-        # Rol IAM de Lambda
-        if aws iam get-role --role-name "${{ env.LAMBDA_ROLE_NAME }}" > /dev/null 2>&1; then
-          for POLICY_ARN in $(aws iam list-attached-role-policies --role-name "${{ env.LAMBDA_ROLE_NAME }}" \
-              --query "AttachedPolicies[].PolicyArn" --output text); do
-            aws iam detach-role-policy --role-name "${{ env.LAMBDA_ROLE_NAME }}" --policy-arn "$POLICY_ARN"
-          done
-          aws iam delete-role --role-name "${{ env.LAMBDA_ROLE_NAME }}"
-          echo "🗑️ IAM role deleted: ${{ env.LAMBDA_ROLE_NAME }}"
-        else
-          echo "- IAM role: Not found"
-        fi
-
-        echo ""
-        echo "✅ AWS cleanup completed"
-
-    - name: Generate AWS Cleanup Summary
-      run: |
-        echo "## 🗑️ AWS Serverless Infrastructure Cleanup" >> $GITHUB_STEP_SUMMARY
-        echo "" >> $GITHUB_STEP_SUMMARY
-        echo "- **Lambdas + Function URLs + log groups**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
-        echo "- **Lambda IAM role**: 🗑️ Deleted" >> $GITHUB_STEP_SUMMARY
+      run: bash scripts/destroy-aws.sh "${{ env.LAMBDA_NAME }}" "${{ env.LAMBDA_ROLE_NAME }}"

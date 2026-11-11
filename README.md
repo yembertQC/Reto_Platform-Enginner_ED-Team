@@ -59,11 +59,14 @@ Cada servicio entrega su propia URL HTTPS pública y escala a cero cuando no hay
   cd-go-multicloud.yml    # CD Go Multi-Cloud — build único (imagen + zip) → Container Apps + Lambda en paralelo (manual)
   infraestructure.yml     # Infraestructura — create/destroy por cloud (manual)
   infra-multicloud.yml    # Infraestructura Multi-Cloud — dispara Azure + AWS a la vez (manual)
+  destroy-all.yml         # Destroy — borra toda la infra de Azure y/o AWS en un run, con confirmación (manual)
   wiki.yml                # Publica doc/ en la Wiki de GitHub (valida enlaces y diagramas)
 scripts/
   deploy-lambda.sh        # Crea/actualiza una Lambda (zip + layer del Web Adapter) + Function URL
   deploy-containerapp.sh  # Crea/actualiza una Azure Container App con una imagen pública de GHCR
   smoke-test.sh           # Verifica /health y / de una URL pública con reintentos
+  destroy-azure.sh        # Borra Container App, Environment, Function App + plan y Storage (conserva el RG)
+  destroy-aws.sh          # Borra las Lambdas, sus log groups y el rol IAM
   build-wiki.sh           # Genera la wiki desde doc/ y valida enlaces
 doc/
   Home.md, 00-…14-*.md             # Wiki del curso (fuente; se publica con wiki.yml)
@@ -139,6 +142,9 @@ Las Container Apps y las Lambdas se crean en el primer despliegue del CD, porque
 
 ### Infraestructura Multi-Cloud — `infra-multicloud.yml`
 Ejecución **manual**. Dispara `infraestructure.yml` simultáneamente para Azure y AWS.
+
+### Destroy — `destroy-all.yml`
+Ejecución **manual**. Borra en un solo run toda la infraestructura del curso (`cloud`: `ambos` / `azure` / `aws`). Para evitar accidentes hay que escribir `ELIMINAR` en el campo `confirmar`. Usa los mismos scripts que el `destroy` de `infraestructure.yml` (`scripts/destroy-azure.sh` y `scripts/destroy-aws.sh`). Conserva el Resource Group y las imágenes de GHCR.
 
 ### Wiki — `wiki.yml`
 Push a `main` con cambios en `doc/` (o manual). Valida enlaces y diagramas Mermaid (también en PRs) y publica `doc/` en la Wiki del repositorio. Requiere tener la Wiki activada y una primera página creada a mano. Detalle en [doc/11-Publicar-la-Wiki.md](doc/11-Publicar-la-Wiki.md).

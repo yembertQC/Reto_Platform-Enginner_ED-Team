@@ -49,7 +49,7 @@ flowchart LR
 | **Desactivar** escáneres o tests para que el pipeline "salga en verde" | Arreglar el hallazgo o documentar la excepción | Un pipeline verde que no comprueba nada es peor que uno rojo |
 | Dejar `fail-build: false` y `warn-only: true` en producción | Bloquear en HIGH/CRITICAL | En el curso están así **solo para poder ver los hallazgos** |
 | Copiar los endpoints `/search` y `/exec` | Consultas parametrizadas y sin `sh -c` (ver [10 · Seguridad](10-Seguridad.md)) | Son vulnerabilidades **de ejemplo** |
-| Dejar la infra del curso **encendida** con esos endpoints públicos | `infra-multicloud.yml` → `destroy` al terminar | `/exec` permite ejecutar comandos en la nube |
+| Dejar la infra del curso **encendida** con esos endpoints públicos | `destroy-all.yml` al terminar | `/exec` permite ejecutar comandos en la nube |
 
 ---
 
