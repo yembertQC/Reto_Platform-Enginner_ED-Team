@@ -13,6 +13,7 @@
 #   ej. deploy-lambda.sh ed-team-app lambda-python.zip ed-team-app-lambda-role python3.13 run.sh 5000
 # Requiere credenciales AWS y región ya configuradas (aws-actions/configure-aws-credentials).
 # LWA_LAYER_VERSION (opcional, por defecto 30) fija la versión de la layer LambdaAdapterLayerX86.
+# LAMBDA_MEMORY (opcional, por defecto 512) fija la memoria en MB; se aplica al crear y al actualizar.
 # Escribe url=<function-url> en $GITHUB_OUTPUT (o stdout fuera de Actions).
 set -euo pipefail
 
@@ -23,6 +24,7 @@ RUNTIME="$4"
 HANDLER="$5"
 PORT="$6"
 OUT="${GITHUB_OUTPUT:-/dev/stdout}"
+MEMORY="${LAMBDA_MEMORY:-512}"
 
 REGION="${AWS_REGION:-$(aws configure get region)}"
 LWA_LAYER_ARN="arn:aws:lambda:${REGION}:753240598075:layer:LambdaAdapterLayerX86:${LWA_LAYER_VERSION:-30}"
@@ -65,6 +67,7 @@ if [ "$PACKAGE_TYPE" = "Zip" ]; then
     --runtime "$RUNTIME" \
     --handler "$HANDLER" \
     --layers "$LWA_LAYER_ARN" \
+    --memory-size "$MEMORY" \
     --environment "Variables={$ENV_VARS}" >/dev/null
   aws lambda wait function-updated-v2 --function-name "$FUNCTION_NAME"
 else
@@ -78,7 +81,7 @@ else
     --layers "$LWA_LAYER_ARN" \
     --role "$ROLE_ARN" \
     --architectures x86_64 \
-    --memory-size 512 \
+    --memory-size "$MEMORY" \
     --timeout 30 \
     --environment "Variables={$ENV_VARS}" >/dev/null
   aws lambda wait function-active-v2 --function-name "$FUNCTION_NAME"

@@ -11,6 +11,8 @@ valida := {
 	"tecnologia": "go",
 	"nube": "azure",
 	"region": "eastus",
+	"ambiente": "dev",
+	"tamano": "pequeño",
 	"teams_existentes": ["pagos", "web", "platform"],
 }
 
@@ -36,4 +38,16 @@ test_region_de_otra_nube if {
 
 test_aws_valida if {
 	count(repo.deny) == 0 with input as object.union(valida, {"nube": "aws", "region": "us-east-1"})
+}
+
+test_tamano_grande if {
+	count(repo.deny) == 1 with input as object.union(valida, {"tamano": "grande"})
+}
+
+test_ambiente_inexistente if {
+	count(repo.deny) == 1 with input as object.union(valida, {"ambiente": "qa"})
+}
+
+test_production_mediano if {
+	count(repo.deny) == 0 with input as object.union(valida, {"ambiente": "production", "tamano": "mediano"})
 }

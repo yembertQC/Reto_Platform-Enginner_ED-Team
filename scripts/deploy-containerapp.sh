@@ -11,6 +11,8 @@
 #
 # Uso: deploy-containerapp.sh <app-name> <resource-group> <environment-name> <image> <port>
 #   ej. deploy-containerapp.sh ed-team-app-go rg-edteam-platform cae-edteam ghcr.io/owner/ed-team-app-go:abc1234 8080
+# Tamaño (opcional): CONTAINERAPP_CPU y CONTAINERAPP_MEMORY (por defecto 0.25 y 0.5Gi; pares válidos
+#   de Container Apps: 0.25/0.5Gi, 0.5/1Gi, 1.0/2Gi...). Se aplican al crear y al actualizar.
 # Requiere sesión de Azure CLI activa (Azure/login).
 # Escribe url=https://<fqdn> en $GITHUB_OUTPUT (o stdout fuera de Actions).
 set -euo pipefail
@@ -23,6 +25,8 @@ PORT="$5"
 OUT="${GITHUB_OUTPUT:-/dev/stdout}"
 PULL_USER="${GHCR_PULL_USER:-}"
 PULL_TOKEN="${GHCR_PULL_TOKEN:-}"
+CPU="${CONTAINERAPP_CPU:-0.25}"
+MEMORY="${CONTAINERAPP_MEMORY:-0.5Gi}"
 
 if [[ -n "$PULL_USER" && -z "$PULL_TOKEN" ]] || [[ -z "$PULL_USER" && -n "$PULL_TOKEN" ]]; then
   echo "::error::Define GHCR_PULL_USER y GHCR_PULL_TOKEN juntas, o ninguna (descarga anónima)."
@@ -89,13 +93,15 @@ if az containerapp show --name "$APP_NAME" --resource-group "$RESOURCE_GROUP" >/
     --name "$APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
     --image "$IMAGE" \
+    --cpu "$CPU" \
+    --memory "$MEMORY" \
     --only-show-errors >/dev/null
 else
   REGISTRY=()
   if [ -n "$PULL_TOKEN" ]; then
     REGISTRY=(--registry-server ghcr.io --registry-username "$PULL_USER" --registry-password "$PULL_TOKEN")
   fi
-  echo "🆕 Creando Container App $APP_NAME con $IMAGE"
+  echo "🆕 Creando Container App $APP_NAME con $IMAGE ($CPU vCPU, $MEMORY)"
   az containerapp create \
     --name "$APP_NAME" \
     --resource-group "$RESOURCE_GROUP" \
@@ -106,8 +112,8 @@ else
     --target-port "$PORT" \
     --min-replicas 0 \
     --max-replicas 10 \
-    --cpu 0.25 \
-    --memory 0.5Gi \
+    --cpu "$CPU" \
+    --memory "$MEMORY" \
     --env-vars PORT="$PORT" ENVIRONMENT=production \
     --only-show-errors >/dev/null
 fi

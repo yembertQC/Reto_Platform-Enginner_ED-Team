@@ -12,6 +12,8 @@ var formLabels = map[string]func(*Request, string){
 	"Tecnología":             func(r *Request, v string) { r.Tecnologia = v },
 	"Nube":                   func(r *Request, v string) { r.Nube = v },
 	"Región":                 func(r *Request, v string) { r.Region = v },
+	"Ambiente":               func(r *Request, v string) { r.Ambiente = v },
+	"Tamaño":                 func(r *Request, v string) { r.Tamano = v },
 	"Para qué es":            func(r *Request, v string) { r.Descripcion = v },
 }
 

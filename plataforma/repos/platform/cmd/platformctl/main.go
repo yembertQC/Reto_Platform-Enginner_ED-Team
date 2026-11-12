@@ -23,6 +23,8 @@ type Request struct {
 	Tecnologia  string `json:"tecnologia"`
 	Nube        string `json:"nube"`
 	Region      string `json:"region"`
+	Ambiente    string `json:"ambiente"`
+	Tamano      string `json:"tamano"`
 	Descripcion string `json:"descripcion"`
 }
 
@@ -31,15 +33,18 @@ type Env struct {
 	Org, PlatformRepo, Author string
 	Issue                     int
 	AuthorIsBot, Policy       bool
+	// Team que aprueba los despliegues a production (M2 · Clase 3). Vacío: production sin protección.
+	ProductionReviewers string
 }
 
 func main() {
 	env := Env{
-		Org:          mustEnv("ORG"),
-		PlatformRepo: mustEnv("PLATFORM_REPO"),
-		Author:       mustEnv("ISSUE_AUTHOR"),
-		AuthorIsBot:  os.Getenv("ISSUE_AUTHOR_TYPE") == "Bot",
-		Policy:       os.Getenv("POLICY_ENABLED") == "true",
+		Org:                 mustEnv("ORG"),
+		PlatformRepo:        mustEnv("PLATFORM_REPO"),
+		Author:              mustEnv("ISSUE_AUTHOR"),
+		AuthorIsBot:         os.Getenv("ISSUE_AUTHOR_TYPE") == "Bot",
+		Policy:              os.Getenv("POLICY_ENABLED") == "true",
+		ProductionReviewers: strings.TrimSpace(os.Getenv("PRODUCTION_REVIEWERS")),
 	}
 	n, err := strconv.Atoi(mustEnv("ISSUE_NUMBER"))
 	if err != nil {

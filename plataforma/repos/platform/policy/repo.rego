@@ -2,8 +2,8 @@
 # Apagada en el Módulo 1: platformctl valida en Go. En M2 · Clase 3 se enciende con la
 # variable de organización POLICY_ENABLED=true y entonces validate() usa esta política.
 #
-# input: {nombre, team, tecnologia, nube, region, teams_existentes: [...]}
-# data:  config/plataforma.json (nombre_regex, plantillas, nubes, teams_reservados)
+# input: {nombre, team, tecnologia, nube, region, ambiente, tamano, teams_existentes: [...]}
+# data:  config/plataforma.json (nombre_regex, plantillas, nubes, ambientes, tamanos, teams_reservados)
 package platform.repo
 
 import rego.v1
@@ -37,4 +37,21 @@ deny contains msg if {
 	nube := data.nubes[input.nube]
 	not input.region in nube.regiones
 	msg := sprintf("la región '%s' no está permitida en %s (permitidas: %s)", [input.region, input.nube, concat(", ", nube.regiones)])
+}
+
+deny contains msg if {
+	not input.ambiente in data.ambientes
+	msg := sprintf("el ambiente '%s' no existe (ambientes: %s)", [input.ambiente, concat(", ", data.ambientes)])
+}
+
+deny contains msg if {
+	not data.tamanos[input.tamano]
+	msg := sprintf("el tamaño '%s' no existe", [input.tamano])
+}
+
+# La regla de la Clase 3 del Módulo 2: regiones (arriba) y tamaños no permitidos.
+deny contains msg if {
+	data.tamanos[input.tamano]
+	not input.tamano in data.tamanos_permitidos
+	msg := sprintf("el tamaño '%s' no está permitido (permitidos: %s)", [input.tamano, concat(", ", data.tamanos_permitidos)])
 }

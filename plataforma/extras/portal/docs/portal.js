@@ -4,6 +4,9 @@
 //                valida lo que puede (config/plataforma.json) y abre el issue en GitHub ya relleno.
 //                No hay backend ni tokens: quien envía el issue es la persona, con su sesión de GitHub.
 // - Catálogo:    catalog/catalog.yml.
+//
+// Vive en platform/docs/ y se publica con GitHub Pages: <org>.github.io/platform/. Lo propuso un
+// equipo de producto con un pull request (InnerSource); el team platform lo revisó por CODEOWNERS.
 // - Solicitudes: issues del repo platform y su etiqueta platform/*.
 //
 // Todo sale de la API pública de GitHub (60 consultas por hora por IP sin sesión; el portal usa 3 por carga).
@@ -112,6 +115,8 @@
   }
 
   // ---------- Crear ----------
+  // Cada campo dropdown con pocas opciones se pinta como botones; con config/plataforma.json se
+  // desactivan las opciones que la plataforma rechazaría (región de otra nube, tamaño no permitido).
   function renderActions() {
     const ul = $("actions");
     ul.replaceChildren();
@@ -187,17 +192,24 @@
       h("small", { text: "GitHub muestra el formulario con estos datos. Revísalo y pulsa «Create». Si algún desplegable llega vacío, elígelo allí: el resto ya va relleno." }));
     const preview = h("details", { class: "preview" }, h("summary", { text: "Ver el issue que se va a crear" }), pre);
 
-    // Nube → regiones permitidas (config/plataforma.json)
-    function syncRegions() {
-      if (!els.nube || !els.region || !els.region.radios || !cfg || !cfg.nubes) return;
-      const allowed = (cfg.nubes[els.nube.get()] || {}).regiones;
-      const radios = [...els.region.el.querySelectorAll("input")];
+    // Lo que permite config/plataforma.json: regiones de la nube elegida, ambientes y tamaños.
+    // La plataforma lo vuelve a validar al recibir el issue; aquí solo se evita pedir algo que se rechazará.
+    function limit(field, allowed, autoPick) {
+      if (!field || !field.radios || !allowed) return;
+      const radios = [...field.el.querySelectorAll("input")];
       for (const r of radios) {
-        r.disabled = !!allowed && !allowed.includes(r.value);
+        r.disabled = !allowed.includes(r.value);
+        r.parentElement.title = r.disabled ? "No permitido por la plataforma" : "";
         if (r.disabled && r.checked) r.checked = false;
       }
       const usable = radios.filter((r) => !r.disabled);
-      if (allowed && usable.length === 1) usable[0].checked = true;
+      if (autoPick && usable.length === 1) usable[0].checked = true;
+    }
+    function syncRegions() {
+      if (!cfg) return;
+      if (els.nube && cfg.nubes) limit(els.region, (cfg.nubes[els.nube.get()] || {}).regiones, true);
+      limit(els.ambiente, cfg.ambientes, false);
+      limit(els.tamano, cfg.tamanos_permitidos, false);
     }
 
     function update() {
@@ -255,7 +267,8 @@
       h("div", { class: "chips" },
         h("span", { class: "chip team", text: "@" + s.team }),
         h("span", { class: "chip", text: s.tecnologia }),
-        h("span", { class: "chip", text: `${s.nube} · ${s.region}` })),
+        h("span", { class: "chip", text: `${s.nube} · ${s.region}` }),
+        s.ambiente ? h("span", { class: "chip", text: `${s.ambiente}${s.tamano ? " · " + s.tamano : ""}` }) : null),
       h("div", { class: "meta" },
         h("span", { text: `Pedido por @${s.autor}` }),
         h("span", { text: s.origen === "agente" ? "agente de IA" : "persona" }),

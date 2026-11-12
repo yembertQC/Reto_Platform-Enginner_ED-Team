@@ -1,6 +1,6 @@
 {
-  "nombre_regex": "^[a-z][a-z0-9-]{1,26}[a-z0-9]$",
-  "nombre_ayuda": "minúsculas, números y guiones, de 3 a 28 caracteres; empieza con letra y no termina en guion",
+  "nombre_regex": "^[a-z][a-z0-9-]{1,25}[a-z0-9]$",
+  "nombre_ayuda": "minúsculas, números y guiones, de 3 a 27 caracteres; empieza con letra y no termina en guion",
   "plantillas": {
     "go": "template-go",
     "python": "template-python"
@@ -15,5 +15,24 @@
       "variable_region": "AWS_REGION"
     }
   },
+  "ambientes": ["dev", "production"],
+  "tamanos": {
+    "pequeño": {
+      "cpu": "0.25",
+      "memoria": "0.5Gi",
+      "lambda_mb": "512"
+    },
+    "mediano": {
+      "cpu": "0.5",
+      "memoria": "1Gi",
+      "lambda_mb": "1024"
+    },
+    "grande": {
+      "cpu": "1.0",
+      "memoria": "2Gi",
+      "lambda_mb": "2048"
+    }
+  },
+  "tamanos_permitidos": ["pequeño", "mediano"],
   "teams_reservados": ["platform"]
 }

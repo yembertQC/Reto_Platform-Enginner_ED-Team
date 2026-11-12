@@ -1,4 +1,5 @@
 # pipelines/.github/workflows/build.yml — el golden path de la organización.
+# Solución de M1 · Clase 4: el alumno lo genera con Copilot desde cd-go.yml y lo corrige.
 # Contrato: service, language, environment, version. La nube y la región NO las elige quien llama:
 # salen de las variables del repo que puso platformctl (CLOUD_PROVIDER, AZURE_LOCATION o AWS_REGION),
 # o de las de la organización si el repo no las tiene.
@@ -22,7 +23,7 @@ on:
         type: string
         default: go
       environment:
-        description: Sufijo del recurso desplegado (<service>-<environment>)
+        description: dev | production. Environment de GitHub del job de deploy; production puede exigir aprobación
         type: string
         default: dev
       version:
@@ -35,7 +36,8 @@ permissions: {}
 env:
   CLOUD_PROVIDER: ${{ vars.CLOUD_PROVIDER }}
   LANGUAGE: ${{ inputs.language }}
-  APP_NAME: ${{ inputs.service }}-${{ inputs.environment }}
+  # <servicio>-dev o <servicio>-prod: cabe en los 32 caracteres de una Container App con nombres de hasta 27
+  APP_NAME: ${{ inputs.service }}-${{ inputs.environment == 'production' && 'prod' || inputs.environment }}
   PORT: '8080'
   # Solo se publica y despliega desde main; un pull request construye y prueba.
   DEPLOY: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
@@ -156,6 +158,9 @@ jobs:
           IMAGE: ${{ needs.build.outputs.artifact }}
           RG: ${{ vars.RESOURCE_GROUP }}
           CAE: ${{ vars.CONTAINERAPP_ENV_NAME }}
+          # Tamaño que pidió el issue (lo puso platformctl como variables del repo)
+          CONTAINERAPP_CPU: ${{ vars.CONTAINERAPP_CPU }}
+          CONTAINERAPP_MEMORY: ${{ vars.CONTAINERAPP_MEMORY }}
           # Credencial de solo lectura de la organización: el paquete de GHCR se queda privado
           GHCR_PULL_USER: ${{ vars.GHCR_PULL_USER }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
@@ -176,6 +181,7 @@ jobs:
         if: env.CLOUD_PROVIDER == 'aws'
         env:
           ROLE: ${{ vars.LAMBDA_ROLE_NAME }}
+          LAMBDA_MEMORY: ${{ vars.LAMBDA_MEMORY }}
         run: |
           if [ "$LANGUAGE" = "go" ]; then RUNTIME=provided.al2023; HANDLER=bootstrap; else RUNTIME=python3.13; HANDLER=run.sh; fi
           bash pipelines/scripts/deploy-lambda.sh "$APP_NAME" lambda.zip "$ROLE" "$RUNTIME" "$HANDLER" "$PORT"
@@ -197,6 +203,7 @@ jobs:
             echo "|---|---|"
             echo "| Lenguaje | $LANGUAGE |"
             echo "| Nube | $CLOUD_PROVIDER |"
+            echo "| Ambiente | ${{ inputs.environment }} |"
             echo "| Artefacto | \`$ARTIFACT\` |"
             echo "| URL | $URL |"
             echo "| Health | $URL/health |"

@@ -21,7 +21,7 @@
       "id": "nombre",
       "attributes": {
        "label": "Nombre del repositorio",
-       "description": "Minúsculas, números y guiones. De 3 a 28 caracteres. Empieza con letra y no termina en guion.",
+       "description": "Minúsculas, números y guiones. De 3 a 27 caracteres. Empieza con letra y no termina en guion.",
        "placeholder": "pagos-ledger"
       },
       "validations": {
@@ -89,6 +89,37 @@
       }
      },
      {
+      "type": "dropdown",
+      "id": "ambiente",
+      "attributes": {
+       "label": "Ambiente",
+       "description": "dev para probar. production es el que usan los clientes: desde el Módulo 2 exige aprobación.",
+       "options": [
+        "dev",
+        "production"
+       ]
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
+      "type": "dropdown",
+      "id": "tamano",
+      "attributes": {
+       "label": "Tamaño",
+       "description": "pequeño: 0.25 vCPU y 0.5 GB (512 MB en Lambda). mediano: 0.5 vCPU y 1 GB. grande: 1 vCPU y 2 GB.",
+       "options": [
+        "pequeño",
+        "mediano",
+        "grande"
+       ]
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
       "type": "textarea",
       "id": "descripcion",
       "attributes": {
@@ -104,8 +135,8 @@
   }
  ],
  "config": {
-  "nombre_regex": "^[a-z][a-z0-9-]{1,26}[a-z0-9]$",
-  "nombre_ayuda": "minúsculas, números y guiones, de 3 a 28 caracteres; empieza con letra y no termina en guion",
+  "nombre_regex": "^[a-z][a-z0-9-]{1,25}[a-z0-9]$",
+  "nombre_ayuda": "minúsculas, números y guiones, de 3 a 27 caracteres; empieza con letra y no termina en guion",
   "plantillas": {
    "go": "template-go",
    "python": "template-python"
@@ -124,6 +155,31 @@
     "variable_region": "AWS_REGION"
    }
   },
+  "ambientes": [
+   "dev",
+   "production"
+  ],
+  "tamanos": {
+   "pequeño": {
+    "cpu": "0.25",
+    "memoria": "0.5Gi",
+    "lambda_mb": "512"
+   },
+   "mediano": {
+    "cpu": "0.5",
+    "memoria": "1Gi",
+    "lambda_mb": "1024"
+   },
+   "grande": {
+    "cpu": "1.0",
+    "memoria": "2Gi",
+    "lambda_mb": "2048"
+   }
+  },
+  "tamanos_permitidos": [
+   "pequeño",
+   "mediano"
+  ],
   "teams_reservados": [
    "platform"
   ]
@@ -135,6 +191,8 @@
    "tecnologia": "go",
    "nube": "azure",
    "region": "eastus",
+   "ambiente": "production",
+   "tamano": "mediano",
    "descripcion": "Libro mayor de los cobros con tarjeta.",
    "autor": "ana-pagos",
    "origen": "persona",
@@ -147,6 +205,8 @@
    "tecnologia": "python",
    "nube": "azure",
    "region": "eastus",
+   "ambiente": "dev",
+   "tamano": "pequeño",
    "descripcion": "API de la landing de campañas.",
    "autor": "luis-web",
    "origen": "persona",
@@ -159,6 +219,8 @@
    "tecnologia": "python",
    "nube": "aws",
    "region": "us-east-1",
+   "ambiente": "dev",
+   "tamano": "pequeño",
    "descripcion": "Concilia los pagos del banco cada noche.",
    "autor": "platform-agent[bot]",
    "origen": "agente",

@@ -1,25 +1,9 @@
-# Lo único que ve el equipo. Todo lo demás (tests, imagen, nube, smoke test) vive en pipelines.
-name: Deploy
-
-on:
-  push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
-
-permissions: {}
-
+# Todo lo demás vive en pipelines. Las variables del repo (nube, ambiente, tamaño) las pone la plataforma.
+on: [push, pull_request, workflow_dispatch]
 jobs:
   deploy:
-    # SERVICE_TEAM la crea platformctl al dar de alta el repo. Así no despliega la propia
-    # plantilla ni el primer commit del repo nuevo, que llega antes que sus variables.
-    if: vars.SERVICE_TEAM != ''
+    if: ${{ !github.event.repository.is_template }}
     uses: __ORG__/pipelines/.github/workflows/build.yml@v1
+    permissions: { contents: read, packages: write }
     secrets: inherit
-    permissions:
-      contents: read
-      packages: write
-    with:
-      service: ${{ github.event.repository.name }}
-      language: python
-      version: 1.0.0
+    with: { service: "${{ github.event.repository.name }}", language: python, environment: "${{ vars.DEPLOY_ENVIRONMENT || 'dev' }}", version: 1.0.0 }

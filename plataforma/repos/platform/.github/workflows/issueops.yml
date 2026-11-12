@@ -50,3 +50,5 @@ jobs:
           # El cuerpo va por env, nunca interpolado en el script: lo escribe cualquiera
           ISSUE_BODY: ${{ github.event.issue.body }}
           POLICY_ENABLED: ${{ vars.POLICY_ENABLED }}
+          # Módulo 2 · Clase 3: team que aprueba production (p. ej. platform). Vacío: sin protección.
+          PRODUCTION_REVIEWERS: ${{ vars.PRODUCTION_REVIEWERS }}

@@ -100,14 +100,17 @@ func (g *GitHub) setVariable(org, repo, name, value string) error {
 	return err
 }
 
-// putFile crea (sha vacío) o actualiza un archivo con un commit.
-func (g *GitHub) putFile(org, repo, path, content, sha, message string) error {
+// putFile crea (sha vacío) o actualiza un archivo con un commit. Devuelve el sha del commit.
+func (g *GitHub) putFile(org, repo, path, content, sha, message string) (string, error) {
 	body := map[string]string{"message": message, "content": base64.StdEncoding.EncodeToString([]byte(content))}
 	if sha != "" {
 		body["sha"] = sha
 	}
-	_, err := g.do("PUT", "/repos/"+org+"/"+repo+"/contents/"+path, body, nil)
-	return err
+	var out struct {
+		Commit struct{ Sha string }
+	}
+	_, err := g.do("PUT", "/repos/"+org+"/"+repo+"/contents/"+path, body, &out)
+	return out.Commit.Sha, err
 }
 
 // issueRef agrupa lo que se hace sobre el issue de la petición. Sus errores se registran

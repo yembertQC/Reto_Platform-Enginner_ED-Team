@@ -1,5 +1,6 @@
 # En el curso, este formulario lo escribe el alumno en la Clase 6 del Módulo 1. Este es el resultado.
 # Las etiquetas (label) son el contrato con platformctl: si cambias una, cambia parse() en cmd/platformctl.
+# Las opciones permitidas (regiones, ambientes, tamaños) las decide config/plataforma.json, no este archivo.
 name: Pedir un servicio
 description: Crea un repositorio nuevo desde la plantilla de la plataforma y lo despliega.
 title: "[servicio]: "
@@ -13,7 +14,7 @@ body:
     id: nombre
     attributes:
       label: Nombre del repositorio
-      description: Minúsculas, números y guiones. De 3 a 28 caracteres. Empieza con letra y no termina en guion.
+      description: Minúsculas, números y guiones. De 3 a 27 caracteres. Empieza con letra y no termina en guion.
       placeholder: pagos-ledger
     validations:
       required: true
@@ -47,6 +48,22 @@ body:
       label: Región
       description: "Tiene que corresponder a la nube: eastus es de Azure, us-east-1 de AWS."
       options: [eastus, us-east-1]
+    validations:
+      required: true
+  - type: dropdown
+    id: ambiente
+    attributes:
+      label: Ambiente
+      description: "dev para probar. production es el que usan los clientes: desde el Módulo 2 exige aprobación."
+      options: [dev, production]
+    validations:
+      required: true
+  - type: dropdown
+    id: tamano
+    attributes:
+      label: Tamaño
+      description: "pequeño: 0.25 vCPU y 0.5 GB (512 MB en Lambda). mediano: 0.5 vCPU y 1 GB. grande: 1 vCPU y 2 GB."
+      options: [pequeño, mediano, grande]
     validations:
       required: true
   - type: textarea

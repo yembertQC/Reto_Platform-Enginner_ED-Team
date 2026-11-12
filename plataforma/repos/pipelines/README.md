@@ -14,6 +14,7 @@ jobs:
     with:
       service: ${{ github.event.repository.name }}
       language: go          # o python
+      environment: dev      # o production
       version: 1.0.0
 ```
 
@@ -21,10 +22,12 @@ jobs:
 |---|---|---|
 | `service` | sí | Nombre del servicio. El recurso desplegado se llama `<service>-<environment>`. |
 | `language` | no (`go`) | `go` o `python`. |
-| `environment` | no (`dev`) | Sufijo del recurso y environment de GitHub del job de deploy. |
+| `environment` | no (`dev`) | `dev` o `production`. Environment de GitHub del job de deploy (production puede exigir aprobación) y sufijo del recurso: `<service>-dev` o `<service>-prod`. |
 | `version` | sí | Va en el tag de la imagen: `<version>-<sha corto>`. |
 
-La nube **no** es un input: sale de la variable `CLOUD_PROVIDER` del repo (la pone `platformctl` según lo que se pidió en el issue) o, si el repo no la tiene, de la de la organización.
+La nube y el tamaño **no** son inputs: salen de las variables del repo que pone `platformctl` según lo que se pidió en el issue (`CLOUD_PROVIDER`, `CONTAINERAPP_CPU`, `CONTAINERAPP_MEMORY`, `LAMBDA_MEMORY`) o, si el repo no las tiene, de la organización y de los valores por defecto de los scripts.
+
+`build.yml` no viene en la plantilla del curso: lo generas en M1 · Clase 4 desde `cd-go.yml` del reto. La solución está en `plataforma/soluciones/pipelines/`.
 
 ## Qué necesita la organización
 

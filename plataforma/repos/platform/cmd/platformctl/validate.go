@@ -20,7 +20,14 @@ type Config struct {
 		Regiones       []string `json:"regiones"`
 		VariableRegion string   `json:"variable_region"`
 	} `json:"nubes"`
-	TeamsReservados []string `json:"teams_reservados"`
+	Ambientes []string `json:"ambientes"`
+	Tamanos   map[string]struct {
+		CPU      string `json:"cpu"`
+		Memoria  string `json:"memoria"`
+		LambdaMB string `json:"lambda_mb"`
+	} `json:"tamanos"`
+	TamanosPermitidos []string `json:"tamanos_permitidos"`
+	TeamsReservados   []string `json:"teams_reservados"`
 
 	nameRule *regexp.Regexp // nombre_regex compilada. De 3 a 28: <nombre>-dev cabe en los 32 de una Container App.
 }
@@ -91,13 +98,22 @@ func rules(req Request, cfg Config, teams []string) []string {
 	} else if !slices.Contains(nube.Regiones, req.Region) {
 		p = append(p, fmt.Sprintf("la región '%s' no está permitida en %s (permitidas: %s)", req.Region, req.Nube, strings.Join(nube.Regiones, ", ")))
 	}
+	if !slices.Contains(cfg.Ambientes, req.Ambiente) {
+		p = append(p, fmt.Sprintf("el ambiente '%s' no existe (ambientes: %s)", req.Ambiente, strings.Join(cfg.Ambientes, ", ")))
+	}
+	if _, ok := cfg.Tamanos[req.Tamano]; !ok {
+		p = append(p, fmt.Sprintf("el tamaño '%s' no existe", req.Tamano))
+	} else if !slices.Contains(cfg.TamanosPermitidos, req.Tamano) {
+		p = append(p, fmt.Sprintf("el tamaño '%s' no está permitido (permitidos: %s)", req.Tamano, strings.Join(cfg.TamanosPermitidos, ", ")))
+	}
 	return p
 }
 
 func validateOPA(req Request, teams []string) ([]string, error) {
 	input, _ := json.Marshal(map[string]any{
 		"nombre": req.Nombre, "team": req.Team, "tecnologia": req.Tecnologia,
-		"nube": req.Nube, "region": req.Region, "teams_existentes": teams,
+		"nube": req.Nube, "region": req.Region, "ambiente": req.Ambiente, "tamano": req.Tamano,
+		"teams_existentes": teams,
 	})
 	cmd := exec.Command("opa", "eval", "--format", "json", "--stdin-input",
 		"-d", "policy/repo.rego", "-d", "config/plataforma.json", "data.platform.repo.deny")

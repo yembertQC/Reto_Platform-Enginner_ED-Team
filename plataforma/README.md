@@ -2,30 +2,43 @@
 
 Lo que se entrega a una organización de GitHub para que tenga su plataforma interna: pedir un servicio con un issue y tenerlo desplegado sin tocar la nube.
 
-El resto de este repo (la raíz) es el reto: el "antes", un solo equipo desplegando a mano su golden path. Esta carpeta es el "después" y no se despliega desde aquí.
+El resto de este repo (la raíz) es el reto: el "antes", un solo equipo desplegando su golden path. Esta carpeta es la **plantilla del curso**, el "después", y no se despliega desde aquí.
 
 ```bash
-gh auth login                           # como owner de la organización
-bash plataforma/bootstrap.sh <tu-org>   # crea teams y los siete repos; idempotente
+gh auth login                                        # como owner de la organización
+bash plataforma/bootstrap.sh <tu-org>                # M1 · Clase 3: lo que viene hecho
+bash plataforma/bootstrap.sh <tu-org> --completo     # con las soluciones del curso ya puestas
+bash plataforma/bootstrap.sh <tu-org> --completo --portal   # + el extra InnerSource
 ```
 
-| Carpeta | Repo en la org | Qué es |
-|---|---|---|
-| `repos/org-profile/` | `.github` | Portada de la organización con el enlace al formulario |
-| `repos/pipelines/` | `pipelines` | `build.yml@v1`: tests, artefacto y despliegue para Go y Python, en Azure o AWS. `bootstrap.sh` le añade `scripts/` de la raíz |
-| `repos/template-go/` | `template-go` | Plantilla de servicio en Go (marcada como template) |
-| `repos/template-python/` | `template-python` | Plantilla de servicio en Python (marcada como template) |
-| `repos/platform/` | `platform` | El orquestador: formulario, `issueops.yml`, `platformctl`, configuración y política OPA |
-| `repos/catalog/` | `catalog` | `catalog.yml`: qué servicios hay y de quién son |
-| `repos/portal/` | `portal` | La cara de la IDP en GitHub Pages: acciones de autoservicio (los formularios de `platform`), catálogo y solicitudes. Sin backend: abre el issue ya relleno |
+## Tres carpetas
+
+| Carpeta | Qué es |
+|---|---|
+| `repos/` | Lo que viene hecho. Cada subcarpeta es uno de los **seis repos** de la organización. |
+| `soluciones/` | Lo que construye el alumno, con la misma estructura de carpetas. `--completo` lo copia encima de `repos/`. |
+| `extras/portal/` | El portal de autoservicio, propuesto como pull request al repo `platform` (InnerSource). |
+
+## Los seis repos
+
+| Carpeta | Repo | Viene hecho | Lo construyes tú (y está en `soluciones/`) |
+|---|---|---|---|
+| `org-profile/` | `.github` | Portada de la organización | — |
+| `pipelines/` | `pipelines` | README, CONTRIBUTING, `scripts/` (los copia `bootstrap.sh` desde la raíz) | `build.yml` reutilizable y el tag `v1` (M1 · C4); `CODEOWNERS` (M1 · C5) |
+| `template-go/` | `template-go` | Plantilla Go con `deploy.yml` de ocho líneas | — |
+| `template-python/` | `template-python` | Plantilla Python con `deploy.yml` de ocho líneas | — |
+| `platform/` | `platform` | `issueops.yml`, `platformctl`, `config/plataforma.json`, `policy/repo.rego` apagada | `CODEOWNERS` (M1 · C5); el formulario (M1 · C6) |
+| `catalog/` | `catalog` | `catalog.yml` vacío | `CODEOWNERS` (M1 · C5) |
+
+Fuera de los archivos: los teams `platform`, `pagos` y `web` (M1 · C5, `--completo` los crea) y, en M2 · Clase 3, las variables `PRODUCTION_REVIEWERS=platform` (production exige aprobación) y `POLICY_ENABLED=true` (la regla OPA decide).
 
 ## Una petición, de principio a fin
 
-1. Alguien abre un issue en `platform` con el formulario: nombre, team, tecnología (`go`/`python`), nube (`azure`/`aws`) y región.
-2. `platformctl` valida: autor miembro, nombre con la convención, team existente, región permitida para esa nube, repo inexistente.
-3. Crea el repo desde `template-<tecnología>`, da `write` al team, pone `CLOUD_PROVIDER`, la región y `SERVICE_TEAM` como variables del repo y escribe `CODEOWNERS`.
-4. Añade la fila al catálogo, contesta en el issue y lo cierra.
-5. El commit de `CODEOWNERS` dispara `deploy.yml`, que llama a `pipelines/build.yml@v1`: Container Apps en Azure (imagen privada en GHCR) o Lambda con Function URL en AWS.
+1. Alguien (persona o agente de IA) abre un issue en `platform` con el formulario: nombre, team, tecnología (`go`/`python`), nube (`azure`/`aws`), región, ambiente (`dev`/`production`) y tamaño (`pequeño`/`mediano`/`grande`).
+2. `platformctl` valida con `config/plataforma.json`: autor miembro, nombre con la convención (3 a 27 caracteres), team existente, región permitida para esa nube, tamaño permitido (`grande` no), repo inexistente.
+3. Crea el repo desde `template-<tecnología>`, da `write` al team y le pone variables: nube, región, ambiente, CPU y memoria. Si el ambiente es `production` y existe `PRODUCTION_REVIEWERS`, crea el environment con aprobación obligatoria.
+4. Escribe `CODEOWNERS` (ese commit dispara el despliegue; cancela el del commit inicial, que llegó antes que las variables), añade la fila al catálogo, contesta en el issue y lo cierra.
+5. `deploy.yml` llama a `pipelines/build.yml@v1`: Container Apps en Azure (imagen privada en GHCR) o Lambda con Function URL en AWS, como `<nombre>-dev` o `<nombre>-prod`.
 
 ## Qué no hace `bootstrap.sh`
 
@@ -37,5 +50,6 @@ Credenciales y decisiones de la organización: secretos de nube, el token de sol
 (cd plataforma/repos/platform && go test ./...)
 (cd plataforma/repos/template-go && go test -race ./...)
 (cd plataforma/repos/template-python && uv run --no-project --with-requirements requirements-dev.txt python -m pytest -q)
-uvx --from actionlint-py actionlint plataforma/repos/*/.github/workflows/*.yml
+uvx --from actionlint-py actionlint plataforma/repos/*/.github/workflows/*.yml plataforma/soluciones/*/.github/workflows/*.yml
+uv run --no-project python -m http.server -d plataforma/extras/portal/docs 8000   # http://localhost:8000/?demo
 ```
