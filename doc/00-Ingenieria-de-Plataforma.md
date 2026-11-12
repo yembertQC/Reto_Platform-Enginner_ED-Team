@@ -148,6 +148,67 @@ flowchart LR
 | 3 · Autoservicio | El alta de un servicio se pide con un formulario y la ejecuta un programa | El laboratorio manual de las páginas 7 y 8 |
 | 4 · Guardrails | La nube se alcanza sin secretos guardados y las reglas se aplican a todos | Los tres secretos estáticos y el environment `production` |
 
+### 🗺️ Del repo del reto a tu organización
+
+El curso trabaja con tres capas. Este repo es la primera y **no se convierte en la plataforma**: es el "antes" y el banco de piezas. La plataforma vive en repos nuevos de una organización de GitHub.
+
+```mermaid
+flowchart LR
+    RETO["📦 Este repo · el reto<br/>Nivel 1: un solo equipo<br/>cd-go.yml, scripts/, src-go/"]
+    CURSO["🏫 Organización del curso<br/>los repos plantilla de la plataforma<br/>y platform-bootstrap"]
+    ORG["🏢 Tu organización<br/>los cinco repos funcionando<br/>y los servicios que pides"]
+
+    RETO -->|"sus piezas se extraen<br/>y se limpian"| CURSO
+    CURSO -->|"bootstrap.sh tu-org"| ORG
+
+    classDef repo fill:#FFE8A3,stroke:#B58900,color:#1a1a1a
+    classDef tpl fill:#F4ECF7,stroke:#7D3C98,color:#1a1a1a
+    classDef org fill:#D6EAF8,stroke:#2874A6,color:#1a1a1a
+    class RETO repo
+    class CURSO tpl
+    class ORG org
+```
+
+`bootstrap.sh` crea en tu organización cinco repos desde las plantillas del curso:
+
+| Repo | Para qué sirve | De qué pieza de este repo sale | Dónde se ve |
+|------|----------------|--------------------------------|-------------|
+| `.github` | La portada de la organización: qué es cada repo y el enlace al formulario | — | M1 · Clase 3 |
+| `pipelines` | El camino a producción: `build.yml` reutilizable (`workflow_call`) con tres datos (servicio, ambiente y versión), publicado como `@v1` | `cd-go.yml` y `scripts/` | M1 · Clase 4; la `v2`, en M2 · Clase 5 |
+| `template-service` | De donde nace cada servicio: la app y un `deploy.yml` de 8 líneas que llama a `pipelines@v1` | `src-go/`, sin `/search`, `/exec` ni las credenciales | M1 · Clase 4 |
+| `platform` | El **orquestador**: recibe los pedidos por issue (IssueOps) y `platformctl` valida y crea el repo. La regla en código (OPA) viene escrita y apagada | El laboratorio manual de las páginas 7 y 8, convertido en programa | M1 · Clase 6; M2 · Clases 1 y 3 |
+| `catalog` | La lista de lo que la plataforma creó: qué, para qué team, cuándo y si lo pidió una persona o un agente de IA | — | M1 · Clase 6; la página, en el Módulo 2 |
+
+Lo que viene hecho es lo pesado: `platformctl`, la regla OPA y el catálogo. Lo que da forma a tu organización lo construyes tú, clase a clase: los teams, el `CODEOWNERS`, el formulario y el ambiente de producción protegido.
+
+Así viaja una solicitud dentro de tu organización:
+
+```mermaid
+flowchart LR
+    WHO["🙋 Una persona<br/>o un 🤖 agente de IA"]
+    PLAT["⚙️ platform<br/>issueops.yml + platformctl"]
+    SVC["📦 pagos-ledger<br/>nace de template-service"]
+    CAT["📚 catalog<br/>una fila nueva"]
+    PIPE["🛤️ pipelines@v1"]
+    CLOUD["☁️ Azure Container Apps"]
+
+    WHO -->|"issue con el formulario:<br/>nombre, team y región"| PLAT
+    PLAT -->|"valida y crea el repo<br/>con su team y su CODEOWNERS"| SVC
+    PLAT -->|"apunta lo creado"| CAT
+    PLAT -.->|"comenta y cierra el issue"| WHO
+    SVC -->|"deploy.yml llama a"| PIPE
+    PIPE -->|"tests, imagen en GHCR<br/>y aprobación de production"| CLOUD
+
+    classDef who fill:#D5F5E3,stroke:#1E8449,color:#1a1a1a
+    classDef plat fill:#D6EAF8,stroke:#2874A6,color:#1a1a1a
+    classDef out fill:#F2F3F4,stroke:#777,color:#1a1a1a
+    class WHO who
+    class PLAT,PIPE plat
+    class SVC,CAT,CLOUD out
+```
+
+> 🧠 **No se añade aquí.** Si este repo se convirtiera en la plataforma, cada organización nueva heredaría también lo que tiene a propósito para la demo: los endpoints vulnerables de `src-go/main.go`, el `CODEOWNERS` de una sola persona y el despliegue de un único equipo. Por eso las piezas se extraen, se limpian y se publican como plantillas.
+
 ---
 
 ## 🆚 DevOps, SRE y Platform Engineering

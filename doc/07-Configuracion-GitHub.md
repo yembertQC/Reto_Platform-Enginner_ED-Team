@@ -184,6 +184,8 @@ flowchart LR
 
 > 💡 Si el primer despliegue falla con *"el paquete de GHCR es privado"*, es justo esto: el script lo detecta **antes** de tocar Azure y no rompe nada. Es un paso manual que se hace una vez por paquete; los siguientes despliegues usan el mismo paquete. Solo es necesario si despliegas Go en Azure.
 
+> 🏗️ **En la plataforma no se hace así.** Aquí hay un solo paquete y el paso manual se hace una vez. En una organización con muchos servicios, cada repo nuevo crearía un paquete privado y alguien tendría que hacerlo público a mano. Por eso `deploy-containerapp.sh` acepta además dos variables de entorno, `GHCR_PULL_USER` y `GHCR_PULL_TOKEN` (un token clásico con solo `read:packages`): si las recibe, comprueba la descarga con esa credencial, la guarda en la Container App y el paquete se queda privado. El `pipelines/build.yml` del curso las pasa desde un secreto y una variable de organización. El `GITHUB_TOKEN` no sirve para esto: caduca al terminar el job y Container Apps vuelve a descargar la imagen cada vez que escala desde cero. Ver [Ingeniería de Plataforma](00-Ingenieria-de-Plataforma.md).
+
 ---
 
 ## ✅ Checklist final
