@@ -1,0 +1,58 @@
+# En el curso, este formulario lo escribe el alumno en la Clase 6 del Módulo 1. Este es el resultado.
+# Las etiquetas (label) son el contrato con platformctl: si cambias una, cambia parse() en cmd/platformctl.
+name: Pedir un servicio
+description: Crea un repositorio nuevo desde la plantilla de la plataforma y lo despliega.
+title: "[servicio]: "
+labels: ["platform/pending"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Rellena el formulario y envíalo. La plataforma valida la petición, crea el repo, le da permisos a tu team y lo despliega. Te responde en este mismo issue.
+  - type: input
+    id: nombre
+    attributes:
+      label: Nombre del repositorio
+      description: Minúsculas, números y guiones. De 3 a 28 caracteres. Empieza con letra y no termina en guion.
+      placeholder: pagos-ledger
+    validations:
+      required: true
+  - type: dropdown
+    id: team
+    attributes:
+      label: Team dueño
+      description: El team que responde por el servicio. Tendrá permiso de escritura y será CODEOWNER.
+      options: [pagos, web]
+    validations:
+      required: true
+  - type: dropdown
+    id: tecnologia
+    attributes:
+      label: Tecnología
+      description: Elige la plantilla de partida.
+      options: [go, python]
+    validations:
+      required: true
+  - type: dropdown
+    id: nube
+    attributes:
+      label: Nube
+      description: "Azure: Container Apps. AWS: Lambda con Function URL."
+      options: [azure, aws]
+    validations:
+      required: true
+  - type: dropdown
+    id: region
+    attributes:
+      label: Región
+      description: "Tiene que corresponder a la nube: eastus es de Azure, us-east-1 de AWS."
+      options: [eastus, us-east-1]
+    validations:
+      required: true
+  - type: textarea
+    id: descripcion
+    attributes:
+      label: Para qué es
+      description: Una o dos frases. Va en la descripción del repo y en el catálogo.
+    validations:
+      required: true

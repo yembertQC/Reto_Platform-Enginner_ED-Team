@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Portal de la plataforma</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="portal.css">
+</head>
+<body>
+<header class="bar">
+  <div class="bar-in">
+    <a class="brand" href="#crear" aria-label="Inicio del portal">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span><b id="orgName">organización</b><small>Portal de la plataforma</small></span>
+    </a>
+    <nav class="tabs" aria-label="Secciones">
+      <a href="#crear" data-view="crear">Crear</a>
+      <a href="#catalogo" data-view="catalogo">Catálogo <span class="count" id="nCat"></span></a>
+      <a href="#solicitudes" data-view="solicitudes">Solicitudes <span class="count" id="nReq"></span></a>
+    </nav>
+  </div>
+</header>
+
+<main class="page">
+  <p class="banner" id="banner" hidden></p>
+
+  <!-- Crear: cada issue form de platform/.github/ISSUE_TEMPLATE es una acción de autoservicio -->
+  <section class="view" id="view-crear" aria-labelledby="h-crear">
+    <div class="intro">
+      <h1 id="h-crear">¿Qué necesitas?</h1>
+      <p>Cada acción es un formulario de la plataforma. Rellénalo aquí; el portal abre el issue en GitHub ya completo, lo envías y la plataforma hace el resto. Te contesta en el mismo issue.</p>
+    </div>
+    <div class="crear">
+      <ul class="actions" id="actions" aria-label="Acciones disponibles"></ul>
+      <div class="action-panel" id="panel">
+        <p class="muted">Cargando las acciones…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Catálogo: catalog/catalog.yml -->
+  <section class="view" id="view-catalogo" aria-labelledby="h-cat" hidden>
+    <div class="intro">
+      <h1 id="h-cat">Catálogo de servicios</h1>
+      <p>Todo lo que creó la plataforma, de quién es y dónde corre. Lo escribe <code>platformctl</code> en el repo <code>catalog</code>.</p>
+    </div>
+    <div class="filters" role="search">
+      <label class="f-search"><span class="sr">Buscar</span><input id="q" type="search" placeholder="Buscar por nombre o descripción" autocomplete="off"></label>
+      <label><span class="sr">Team</span><select id="fTeam"><option value="">Todos los teams</option></select></label>
+      <label><span class="sr">Tecnología</span><select id="fTec"><option value="">Toda tecnología</option></select></label>
+      <label><span class="sr">Nube</span><select id="fNube"><option value="">Toda nube</option></select></label>
+    </div>
+    <p class="muted" id="catStatus">Cargando el catálogo…</p>
+    <ul class="services" id="services"></ul>
+  </section>
+
+  <!-- Solicitudes: issues del repo platform -->
+  <section class="view" id="view-solicitudes" aria-labelledby="h-req" hidden>
+    <div class="intro">
+      <h1 id="h-req">Solicitudes</h1>
+      <p>Los issues del repo <code>platform</code>. La etiqueta dice en qué punto está cada una.</p>
+    </div>
+    <div class="legend" id="legend"></div>
+    <p class="muted" id="reqStatus">Cargando las solicitudes…</p>
+    <ol class="requests" id="requests"></ol>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="foot-in" id="foot"></div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+<script src="config.js"></script>
+<script src="portal.js"></script>
+</body>
+</html>

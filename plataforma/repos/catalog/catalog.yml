@@ -1,0 +1,4 @@
+# Catálogo de servicios de la organización.
+# Lo escribe platformctl cada vez que crea un servicio; no se edita a mano.
+# origen: persona (lo pidió alguien del equipo) | agente (lo pidió un agente de IA con una GitHub App)
+servicios:

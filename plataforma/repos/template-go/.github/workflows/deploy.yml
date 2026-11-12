@@ -1,0 +1,25 @@
+# Lo único que ve el equipo. Todo lo demás (tests, imagen, nube, smoke test) vive en pipelines.
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  deploy:
+    # SERVICE_TEAM la crea platformctl al dar de alta el repo. Así no despliega la propia
+    # plantilla ni el primer commit del repo nuevo, que llega antes que sus variables.
+    if: vars.SERVICE_TEAM != ''
+    uses: __ORG__/pipelines/.github/workflows/build.yml@v1
+    secrets: inherit
+    permissions:
+      contents: read
+      packages: write
+    with:
+      service: ${{ github.event.repository.name }}
+      language: go
+      version: 1.0.0

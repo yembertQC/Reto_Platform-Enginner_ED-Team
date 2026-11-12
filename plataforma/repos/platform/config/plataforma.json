@@ -1,0 +1,19 @@
+{
+  "nombre_regex": "^[a-z][a-z0-9-]{1,26}[a-z0-9]$",
+  "nombre_ayuda": "minúsculas, números y guiones, de 3 a 28 caracteres; empieza con letra y no termina en guion",
+  "plantillas": {
+    "go": "template-go",
+    "python": "template-python"
+  },
+  "nubes": {
+    "azure": {
+      "regiones": ["eastus"],
+      "variable_region": "AZURE_LOCATION"
+    },
+    "aws": {
+      "regiones": ["us-east-1"],
+      "variable_region": "AWS_REGION"
+    }
+  },
+  "teams_reservados": ["platform"]
+}

@@ -1,0 +1,52 @@
+# platform/.github/workflows/issueops.yml — cada issue del formulario es una petición.
+# platformctl hace el trabajo con el token de la GitHub App de la plataforma, no con el GITHUB_TOKEN:
+# crear repos en la organización y dar permisos a teams está fuera del alcance de este repo.
+name: IssueOps
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions: {}
+
+concurrency:
+  group: issueops-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  handle:
+    if: contains(github.event.issue.labels.*.name, 'platform/pending')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
+        with:
+          go-version-file: go.mod
+
+      # Módulo 2 · Clase 3: con la variable POLICY_ENABLED=true, validate() le pregunta a OPA.
+      - if: vars.POLICY_ENABLED == 'true'
+        uses: open-policy-agent/setup-opa@b2b258e089860efaadaaf71bf6e3aecb4a3eeff1 # v2.4.0
+        with:
+          version: 1.x
+
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.PLATFORM_APP_CLIENT_ID }}
+          private-key: ${{ secrets.PLATFORM_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: platformctl
+        run: go run ./cmd/platformctl
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ORG: ${{ github.repository_owner }}
+          PLATFORM_REPO: ${{ github.event.repository.name }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_AUTHOR_TYPE: ${{ github.event.issue.user.type }}
+          # El cuerpo va por env, nunca interpolado en el script: lo escribe cualquiera
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          POLICY_ENABLED: ${{ vars.POLICY_ENABLED }}

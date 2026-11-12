@@ -1,0 +1,289 @@
+{
+ "templates": [
+  {
+   "file": "nuevo-servicio.yml",
+   "form": {
+    "name": "Pedir un servicio",
+    "description": "Crea un repositorio nuevo desde la plantilla de la plataforma y lo despliega.",
+    "title": "[servicio]: ",
+    "labels": [
+     "platform/pending"
+    ],
+    "body": [
+     {
+      "type": "markdown",
+      "attributes": {
+       "value": "Rellena el formulario y envíalo. La plataforma valida la petición, crea el repo, le da permisos a tu team y lo despliega. Te responde en este mismo issue.\n"
+      }
+     },
+     {
+      "type": "input",
+      "id": "nombre",
+      "attributes": {
+       "label": "Nombre del repositorio",
+       "description": "Minúsculas, números y guiones. De 3 a 28 caracteres. Empieza con letra y no termina en guion.",
+       "placeholder": "pagos-ledger"
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
+      "type": "dropdown",
+      "id": "team",
+      "attributes": {
+       "label": "Team dueño",
+       "description": "El team que responde por el servicio. Tendrá permiso de escritura y será CODEOWNER.",
+       "options": [
+        "pagos",
+        "web"
+       ]
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
+      "type": "dropdown",
+      "id": "tecnologia",
+      "attributes": {
+       "label": "Tecnología",
+       "description": "Elige la plantilla de partida.",
+       "options": [
+        "go",
+        "python"
+       ]
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
+      "type": "dropdown",
+      "id": "nube",
+      "attributes": {
+       "label": "Nube",
+       "description": "Azure: Container Apps. AWS: Lambda con Function URL.",
+       "options": [
+        "azure",
+        "aws"
+       ]
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
+      "type": "dropdown",
+      "id": "region",
+      "attributes": {
+       "label": "Región",
+       "description": "Tiene que corresponder a la nube: eastus es de Azure, us-east-1 de AWS.",
+       "options": [
+        "eastus",
+        "us-east-1"
+       ]
+      },
+      "validations": {
+       "required": true
+      }
+     },
+     {
+      "type": "textarea",
+      "id": "descripcion",
+      "attributes": {
+       "label": "Para qué es",
+       "description": "Una o dos frases. Va en la descripción del repo y en el catálogo."
+      },
+      "validations": {
+       "required": true
+      }
+     }
+    ]
+   }
+  }
+ ],
+ "config": {
+  "nombre_regex": "^[a-z][a-z0-9-]{1,26}[a-z0-9]$",
+  "nombre_ayuda": "minúsculas, números y guiones, de 3 a 28 caracteres; empieza con letra y no termina en guion",
+  "plantillas": {
+   "go": "template-go",
+   "python": "template-python"
+  },
+  "nubes": {
+   "azure": {
+    "regiones": [
+     "eastus"
+    ],
+    "variable_region": "AZURE_LOCATION"
+   },
+   "aws": {
+    "regiones": [
+     "us-east-1"
+    ],
+    "variable_region": "AWS_REGION"
+   }
+  },
+  "teams_reservados": [
+   "platform"
+  ]
+ },
+ "catalog": [
+  {
+   "nombre": "pagos-ledger",
+   "team": "pagos",
+   "tecnologia": "go",
+   "nube": "azure",
+   "region": "eastus",
+   "descripcion": "Libro mayor de los cobros con tarjeta.",
+   "autor": "ana-pagos",
+   "origen": "persona",
+   "fecha": "2026-11-03",
+   "issue": "https://github.com/mi-org/platform/issues/1"
+  },
+  {
+   "nombre": "web-landing",
+   "team": "web",
+   "tecnologia": "python",
+   "nube": "azure",
+   "region": "eastus",
+   "descripcion": "API de la landing de campañas.",
+   "autor": "luis-web",
+   "origen": "persona",
+   "fecha": "2026-11-05",
+   "issue": "https://github.com/mi-org/platform/issues/2"
+  },
+  {
+   "nombre": "pagos-conciliacion",
+   "team": "pagos",
+   "tecnologia": "python",
+   "nube": "aws",
+   "region": "us-east-1",
+   "descripcion": "Concilia los pagos del banco cada noche.",
+   "autor": "platform-agent[bot]",
+   "origen": "agente",
+   "fecha": "2026-11-10",
+   "issue": "https://github.com/mi-org/platform/issues/4"
+  }
+ ],
+ "issues": [
+  {
+   "number": 6,
+   "title": "[servicio]: pagos-api",
+   "html_url": "https://github.com/mi-org/platform/issues/6",
+   "state": "open",
+   "user": {
+    "login": "ana-pagos",
+    "type": "User"
+   },
+   "labels": [
+    {
+     "name": "platform/pending"
+    }
+   ],
+   "created_at": "2026-11-12T14:59:00Z"
+  },
+  {
+   "number": 7,
+   "title": "[servicio]: web-checkout",
+   "html_url": "https://github.com/mi-org/platform/issues/7",
+   "state": "open",
+   "user": {
+    "login": "luis-web",
+    "type": "User"
+   },
+   "labels": [
+    {
+     "name": "platform/running"
+    }
+   ],
+   "created_at": "2026-11-12T14:58:00Z"
+  },
+  {
+   "number": 5,
+   "title": "[servicio]: Pagos_Reportes",
+   "html_url": "https://github.com/mi-org/platform/issues/5",
+   "state": "open",
+   "user": {
+    "login": "marta-pagos",
+    "type": "User"
+   },
+   "labels": [
+    {
+     "name": "platform/pending"
+    },
+    {
+     "name": "platform/rejected"
+    }
+   ],
+   "created_at": "2026-11-12T10:00:00Z"
+  },
+  {
+   "number": 4,
+   "title": "[servicio]: pagos-conciliacion",
+   "html_url": "https://github.com/mi-org/platform/issues/4",
+   "state": "closed",
+   "user": {
+    "login": "platform-agent[bot]",
+    "type": "Bot"
+   },
+   "labels": [
+    {
+     "name": "platform/done"
+    },
+    {
+     "name": "platform/agent"
+    }
+   ],
+   "created_at": "2026-11-10T15:00:00Z"
+  },
+  {
+   "number": 3,
+   "title": "[servicio]: web-search",
+   "html_url": "https://github.com/mi-org/platform/issues/3",
+   "state": "open",
+   "user": {
+    "login": "luis-web",
+    "type": "User"
+   },
+   "labels": [
+    {
+     "name": "platform/failed"
+    }
+   ],
+   "created_at": "2026-11-08T15:00:00Z"
+  },
+  {
+   "number": 2,
+   "title": "[servicio]: web-landing",
+   "html_url": "https://github.com/mi-org/platform/issues/2",
+   "state": "closed",
+   "user": {
+    "login": "luis-web",
+    "type": "User"
+   },
+   "labels": [
+    {
+     "name": "platform/done"
+    }
+   ],
+   "created_at": "2026-11-05T15:00:00Z"
+  },
+  {
+   "number": 1,
+   "title": "[servicio]: pagos-ledger",
+   "html_url": "https://github.com/mi-org/platform/issues/1",
+   "state": "closed",
+   "user": {
+    "login": "ana-pagos",
+    "type": "User"
+   },
+   "labels": [
+    {
+     "name": "platform/done"
+    }
+   ],
+   "created_at": "2026-11-03T15:00:00Z"
+  }
+ ]
+}
