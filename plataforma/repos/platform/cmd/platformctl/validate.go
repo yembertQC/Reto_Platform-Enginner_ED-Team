@@ -55,7 +55,7 @@ func loadConfig(path string) (Config, error) {
 // se evalúan en Go (Módulo 1) o con OPA y policy/repo.rego (Módulo 2, POLICY_ENABLED=true).
 func validate(req Request, env Env, cfg Config, gh *GitHub) []string {
 	var problems []string
-	if !env.AuthorIsBot && !gh.isMember(env.Org, env.Author) {
+	if os.Getenv("ISSUE_AUTHOR_TYPE") != "Bot" && !gh.isMember(env.Org, env.Author) {
 		problems = append(problems, fmt.Sprintf("@%s no es miembro de la organización", env.Author))
 	}
 	if cfg.nameRule.MatchString(req.Nombre) {

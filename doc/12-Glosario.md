@@ -2,7 +2,7 @@
 
 | Término | Significado |
 |---------|-------------|
-| **Agente de IA** (coding agent) | Asistente de IA al que se le asigna un issue y abre un pull request por su cuenta. En el curso, la plataforma lo trata igual que a una persona: mismo pipeline y mismos dueños. |
+| **Agente de IA** | Asistente de IA que actúa por su cuenta: pide servicios llenando el formulario de la plataforma (siguiendo `platform/AGENTS.md`, con la etiqueta `platform/agent`) o, como agente de código, abre pull requests. En el curso, la plataforma lo trata igual que a una persona: mismas reglas, mismo pipeline y mismos dueños. |
 | **Antipatrón** | Solución que parece buena pero causa problemas a medio plazo (ver [13 · Qué NO hacer](13-Que-NO-hacer.md)). |
 | **Artifact** (GitHub Actions) | Archivo que un job guarda para que otro job lo use (por ejemplo `function-app.zip`). |
 | **Azure Container Apps** | Servicio serverless de Azure que ejecuta contenedores y escala según el tráfico, incluso a cero. |
@@ -28,7 +28,7 @@
 | **Flex Consumption** | Plan de Azure Functions que escala a cero y cobra por ejecución. |
 | **Function URL** | URL HTTPS pública que AWS asigna directamente a una Lambda, sin API Gateway. |
 | **GHCR** (GitHub Container Registry) | Registro de imágenes de GitHub (`ghcr.io`). Aquí guarda la imagen de Go que usa Container Apps; sus paquetes nacen privados y este se hace público una vez. Sustituye a un registry propio de la nube (ACR en Azure, ECR en AWS). |
-| **GitHub App** | Identidad de una aplicación en GitHub, con permisos propios y tokens de corta duración. `platformctl` la usa para crear repos y teams en la organización. |
+| **GitHub App** | Identidad de una aplicación en GitHub, con permisos propios y tokens de corta duración. `platformctl` la usa para crear repos, dar permisos a los teams y escribir variables y archivos en la organización. |
 | **Golden path** | Camino recomendado, ya resuelto y seguro, para hacer algo en una plataforma. |
 | **Grype** | Escáner de vulnerabilidades de imágenes de contenedor (de Anchore). |
 | **Guardrail** | Control automático que evita errores graves sin frenar al equipo. |
@@ -47,10 +47,10 @@
 | **Mínimo privilegio** | Dar solo los permisos estrictamente necesarios. |
 | **Multi-stage build** | Dockerfile con varias etapas: se compila en una y se copia solo el resultado a otra más pequeña. |
 | **OIDC** | Forma de que GitHub Actions obtenga credenciales temporales de la nube sin guardar claves fijas. |
-| **OPA** (Open Policy Agent) | Motor de políticas: evalúa reglas escritas en Rego y dice si una petición se permite. En el curso rechaza nombres, teams y regiones no permitidos. |
+| **OPA** (Open Policy Agent) | Motor de políticas: evalúa reglas escritas en Rego y dice si una petición se permite. En el curso rechaza regiones y tamaños no permitidos, además de nombres y teams inválidos. |
 | **Orquestador** | El repo que atiende los pedidos y coordina lo demás. En el curso es `platform`, con `issueops.yml` y `platformctl`. |
 | **pipelines@v1** | El pipeline compartido del curso: un workflow reutilizable del repo `pipelines`, llamado por versión (`@v1`). |
-| **Plantilla** (repo plantilla) | Repo marcado como *template* del que nacen otros con su estructura y archivos. En el curso, `template-service`. |
+| **Plantilla** (repo plantilla) | Repo marcado como *template* del que nacen otros con su estructura y archivos. En el curso, `template-go` y `template-python`. |
 | **Platform as a product** | Tratar la plataforma como un producto: usuarios, feedback, roadmap y documentación. |
 | **platformctl** | Programa en Go del repo `platform` que lee el issue, valida la petición, crea el repo y responde en el issue. |
 | **Push protection** | Función de secret scanning que bloquea un push si contiene un secreto. |

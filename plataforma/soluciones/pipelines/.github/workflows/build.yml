@@ -1,6 +1,6 @@
 # pipelines/.github/workflows/build.yml — el golden path de la organización.
 # Solución de M1 · Clase 4: el alumno lo genera con Copilot desde cd-go.yml y lo corrige.
-# Contrato: service, language, environment, version. La nube y la región NO las elige quien llama:
+# Contrato: tres datos (service, language, environment) y version opcional. La nube y la región NO las elige quien llama:
 # salen de las variables del repo que puso platformctl (CLOUD_PROVIDER, AZURE_LOCATION o AWS_REGION),
 # o de las de la organización si el repo no las tiene.
 #
@@ -27,9 +27,9 @@ on:
         type: string
         default: dev
       version:
-        description: Versión que va en el tag de la imagen
+        description: Versión que va en el tag de la imagen (<version>-<sha corto>)
         type: string
-        required: true
+        default: 1.0.0
 
 permissions: {}
 

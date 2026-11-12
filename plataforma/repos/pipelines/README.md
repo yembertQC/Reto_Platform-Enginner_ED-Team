@@ -15,7 +15,6 @@ jobs:
       service: ${{ github.event.repository.name }}
       language: go          # o python
       environment: dev      # o production
-      version: 1.0.0
 ```
 
 | Input | Obligatorio | Qué es |
@@ -23,7 +22,7 @@ jobs:
 | `service` | sí | Nombre del servicio. El recurso desplegado se llama `<service>-<environment>`. |
 | `language` | no (`go`) | `go` o `python`. |
 | `environment` | no (`dev`) | `dev` o `production`. Environment de GitHub del job de deploy (production puede exigir aprobación) y sufijo del recurso: `<service>-dev` o `<service>-prod`. |
-| `version` | sí | Va en el tag de la imagen: `<version>-<sha corto>`. |
+| `version` | no (`1.0.0`) | Va en el tag de la imagen: `<version>-<sha corto>`. |
 
 La nube y el tamaño **no** son inputs: salen de las variables del repo que pone `platformctl` según lo que se pidió en el issue (`CLOUD_PROVIDER`, `CONTAINERAPP_CPU`, `CONTAINERAPP_MEMORY`, `LAMBDA_MEMORY`) o, si el repo no las tiene, de la organización y de los valores por defecto de los scripts.
 

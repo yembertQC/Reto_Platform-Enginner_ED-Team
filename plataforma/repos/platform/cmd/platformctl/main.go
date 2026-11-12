@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -39,10 +40,13 @@ type Env struct {
 
 func main() {
 	env := Env{
-		Org:                 mustEnv("ORG"),
-		PlatformRepo:        mustEnv("PLATFORM_REPO"),
-		Author:              mustEnv("ISSUE_AUTHOR"),
-		AuthorIsBot:         os.Getenv("ISSUE_AUTHOR_TYPE") == "Bot",
+		Org:          mustEnv("ORG"),
+		PlatformRepo: mustEnv("PLATFORM_REPO"),
+		Author:       mustEnv("ISSUE_AUTHOR"),
+		// Lo pidió un agente: una GitHub App (autor bot) o un agente que actúa con la sesión de una
+		// persona y marca el issue con platform/agent. La persona sigue siendo la responsable.
+		AuthorIsBot: os.Getenv("ISSUE_AUTHOR_TYPE") == "Bot" ||
+			slices.Contains(strings.Split(os.Getenv("ISSUE_LABELS"), ","), "platform/agent"),
 		Policy:              os.Getenv("POLICY_ENABLED") == "true",
 		ProductionReviewers: strings.TrimSpace(os.Getenv("PRODUCTION_REVIEWERS")),
 	}
@@ -63,19 +67,19 @@ func main() {
 	log.Printf("Petición #%d de %s: %+v", env.Issue, env.Author, req)
 
 	if problems := validate(req, env, cfg, gh); len(problems) > 0 {
-		reject(issue, problems)
+		reject(issue, env, problems)
 		return
 	}
 
 	res, err := execute(req, env, cfg, gh, issue)
 	if err != nil {
-		fail(issue, err)
+		fail(issue, env, err)
 		os.Exit(1)
 	}
 	report(issue, req, env, res)
 }
 
-func reject(issue issueRef, problems []string) {
+func reject(issue issueRef, env Env, problems []string) {
 	var b strings.Builder
 	b.WriteString("❌ **No se crea el servicio.** La petición no cumple las reglas de la plataforma:\n\n")
 	for _, p := range problems {
@@ -84,13 +88,13 @@ func reject(issue issueRef, problems []string) {
 	b.WriteString("\nCorrige el formulario editando este issue y se vuelve a evaluar.")
 	issue.comment(b.String())
 	// Se queda abierto y con platform/pending para que una edición lo vuelva a evaluar.
-	issue.setLabels("platform/pending", "platform/rejected")
+	issue.setLabels(append([]string{"platform/pending", "platform/rejected"}, agentLabel(env)...)...)
 	log.Printf("Rechazada: %v", problems)
 }
 
-func fail(issue issueRef, err error) {
+func fail(issue issueRef, env Env, err error) {
 	issue.comment(fmt.Sprintf("⚠️ **La plataforma falló a mitad de la petición.** El team `platform` ya lo tiene en el log del workflow.\n\n```\n%v\n```", err))
-	issue.setLabels("platform/failed")
+	issue.setLabels(append([]string{"platform/failed"}, agentLabel(env)...)...)
 	log.Printf("Error: %v", err)
 }
 
