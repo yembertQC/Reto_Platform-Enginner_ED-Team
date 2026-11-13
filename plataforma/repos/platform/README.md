@@ -16,6 +16,7 @@ issue (formulario) → issueops.yml → platformctl: parse → validate → exec
 | `.github/workflows/issueops.yml` | Lanza `platformctl` con el token de la GitHub App. |
 | `cmd/platformctl/` | `parse`, `validate`, `execute`, `report`. Solo librería estándar de Go. |
 | `config/plataforma.json` | Lo que la plataforma ofrece hoy: convención de nombres, plantillas, nubes y regiones, ambientes, tamaños y cuáles se permiten, teams reservados. |
+| `scripts/metrics.sh` | Métricas de M2 · Clase 4 a partir de los issues: por team, personas vs. agentes, creadas vs. rechazadas y tiempo de respuesta. `bash scripts/metrics.sh <org>` (con `gh` y `jq`), o `--desde scripts/ejemplo/issues.json` para probarlo sin datos. |
 | `policy/repo.rego` | Las mismas reglas que `validate` en Go, como política OPA. Apagada hasta M2 · Clase 3. |
 
 ## Ofrecer algo nuevo

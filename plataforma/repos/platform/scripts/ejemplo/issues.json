@@ -1,0 +1,252 @@
+[
+  {
+    "number": 1,
+    "title": "[servicio]: pagos-ledger",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-19T15:02:11Z",
+    "closed_at": "2026-10-19T15:04:22Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-ledger\n\n### Team dueño\n\npagos\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 2,
+    "title": "[servicio]: Pagos Ledger!!",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "open",
+    "created_at": "2026-10-19T15:20:40Z",
+    "closed_at": null,
+    "labels": [
+      {
+        "name": "platform/rejected"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\nPagos Ledger!!\n\n### Team dueño\n\npagos\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 3,
+    "title": "[servicio]: pagos-api",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-19T15:24:05Z",
+    "closed_at": "2026-10-19T15:25:57Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-api\n\n### Team dueño\n\npagos\n\n### Tamaño\n\nmediano"
+  },
+  {
+    "number": 4,
+    "title": "[servicio]: web-api",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-21T10:11:30Z",
+    "closed_at": "2026-10-21T10:13:08Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\nweb-api\n\n### Team dueño\n\nweb\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 5,
+    "title": "[servicio]: pagos-agente",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-22T09:40:00Z",
+    "closed_at": "2026-10-22T09:42:06Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      },
+      {
+        "name": "platform/agent"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-agente\n\n### Team dueño\n\npagos\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 6,
+    "title": "[servicio]: pagos-batch",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "open",
+    "created_at": "2026-10-22T09:47:12Z",
+    "closed_at": null,
+    "labels": [
+      {
+        "name": "platform/rejected"
+      },
+      {
+        "name": "platform/agent"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-batch\n\n### Team dueño\n\npagos\n\n### Tamaño\n\ngrande"
+  },
+  {
+    "number": 7,
+    "title": "[servicio]: web-front",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-24T14:05:51Z",
+    "closed_at": "2026-10-24T14:07:36Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\nweb-front\n\n### Team dueño\n\nweb\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 8,
+    "title": "[servicio]: pagos-conciliacion",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-27T11:30:00Z",
+    "closed_at": "2026-10-27T11:32:20Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-conciliacion\n\n### Team dueño\n\npagos\n\n### Tamaño\n\nmediano"
+  },
+  {
+    "number": 9,
+    "title": "[servicio]: web-cache",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "open",
+    "created_at": "2026-10-28T16:12:09Z",
+    "closed_at": null,
+    "labels": [
+      {
+        "name": "platform/rejected"
+      },
+      {
+        "name": "platform/agent"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\nweb-cache\n\n### Team dueño\n\nweb\n\n### Tamaño\n\ngrande"
+  },
+  {
+    "number": 10,
+    "title": "[servicio]: pagos-reportes",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-10-29T08:55:43Z",
+    "closed_at": "2026-10-29T08:59:24Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-reportes\n\n### Team dueño\n\npagos\n\n### Tamaño\n\nmediano"
+  },
+  {
+    "number": 11,
+    "title": "[servicio]: web-auth",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-11-02T13:21:18Z",
+    "closed_at": "2026-11-02T13:23:18Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\nweb-auth\n\n### Team dueño\n\nweb\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 12,
+    "title": "[servicio]: pagos-alertas",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-11-03T10:02:37Z",
+    "closed_at": "2026-11-03T10:04:34Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      },
+      {
+        "name": "platform/agent"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-alertas\n\n### Team dueño\n\npagos\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 13,
+    "title": "[servicio]: pagos-webhooks",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-11-05T17:44:02Z",
+    "closed_at": "2026-11-05T17:45:38Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\npagos-webhooks\n\n### Team dueño\n\npagos\n\n### Tamaño\n\npequeño"
+  },
+  {
+    "number": 14,
+    "title": "[servicio]: web-busqueda",
+    "user": {
+      "login": "yembertQC",
+      "type": "User"
+    },
+    "state": "closed",
+    "created_at": "2026-11-06T12:30:25Z",
+    "closed_at": "2026-11-06T12:33:03Z",
+    "labels": [
+      {
+        "name": "platform/done"
+      }
+    ],
+    "body": "### Nombre del repositorio\n\nweb-busqueda\n\n### Team dueño\n\nweb\n\n### Tamaño\n\nmediano"
+  }
+]

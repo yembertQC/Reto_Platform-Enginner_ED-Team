@@ -49,9 +49,11 @@ deny contains msg if {
 	msg := sprintf("el tamaño '%s' no existe", [input.tamano])
 }
 
-# La regla de la Clase 3 del Módulo 2: regiones (arriba) y tamaños no permitidos.
+# La regla de seis líneas de M2 · Clase 3: tamaños no permitidos (la de regiones está arriba).
+# La lámina de esa clase copia estas seis líneas: si cambian, actualizarla.
 deny contains msg if {
 	data.tamanos[input.tamano]
 	not input.tamano in data.tamanos_permitidos
-	msg := sprintf("el tamaño '%s' no está permitido (permitidos: %s)", [input.tamano, concat(", ", data.tamanos_permitidos)])
+	permitidos := concat(", ", data.tamanos_permitidos)
+	msg := sprintf("el tamaño '%s' no está permitido (permitidos: %s)", [input.tamano, permitidos])
 }
