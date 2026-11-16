@@ -6,7 +6,7 @@ RUN go mod download
 COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o server .
 
-FROM alpine:3.20
+FROM alpine:3.24
 
 # Imagen para Azure Container Apps (publicada en GHCR) y para docker run local.
 # En AWS Lambda la app no usa esta imagen: va como zip con el binario "bootstrap".
