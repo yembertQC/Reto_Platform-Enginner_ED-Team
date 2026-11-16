@@ -1,4 +1,4 @@
-FROM python:3.13-slim
+FROM python:3.15-slim
 
 # Imagen para ejecutar la app en local y para el escaneo de seguridad del CI.
 # Ningún despliegue la usa: Azure Functions recibe un zip con remote build y
